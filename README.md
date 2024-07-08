@@ -1,3 +1,5 @@
+<img src="/images/malogo.png" width="300" align="right" /><br><br><br>
+
 # Stream API Sample Code
 Collection of example code and best practices to use the Stream API.
 
