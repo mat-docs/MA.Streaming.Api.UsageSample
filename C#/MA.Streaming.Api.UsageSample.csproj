@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net6.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<SonarQubeExclude>true</SonarQubeExclude>
+		<UseWindowsForms>true</UseWindowsForms>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<LangVersion>latest</LangVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Docker.DotNet" Version="3.125.15" />
+		<PackageReference Include="MA.Streaming.Core" Version="1.*" />
+		<PackageReference Include="MA.Streaming.Proto.Client.Local" Version="1.*" />
+		<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.*" />
+	</ItemGroup>
+
+	
+
+</Project>
