@@ -5,36 +5,35 @@ using System.Timers;
 
 using Timer = System.Timers.Timer;
 
-namespace MA.Streaming.Api.UsageSample.Utility
+namespace MA.Streaming.Api.UsageSample.Utility;
+
+public partial class FrmLoading : Form
 {
-    public partial class FrmLoading : Form
+    private readonly Timer timer = new();
+
+    public FrmLoading()
     {
-        private readonly Timer timer = new();
+        this.InitializeComponent();
+        this.timer.Elapsed += this.Timer_Elapsed;
+    }
 
-        public FrmLoading()
+    private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
+    {
+        this.Invoke((MethodInvoker)this.Close);
+        this.timer.Enabled = false;
+    }
+
+    public void ShowOnForm(Form parentForm, TimeSpan? showTime = null)
+    {
+        this.StartPosition = FormStartPosition.Manual;
+        this.DesktopLocation = parentForm.DesktopLocation;
+        this.Size = parentForm.Size;
+        if (showTime != null)
         {
-            this.InitializeComponent();
-            this.timer.Elapsed += this.Timer_Elapsed;
+            this.timer.Interval = showTime.Value.TotalMilliseconds;
+            this.timer.Enabled = true;
         }
 
-        private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
-        {
-            this.Invoke((MethodInvoker)this.Close);
-            this.timer.Enabled = false;
-        }
-
-        public void ShowOnForm(Form parentForm, TimeSpan? showTime = null)
-        {
-            this.StartPosition = FormStartPosition.Manual;
-            this.DesktopLocation = parentForm.DesktopLocation;
-            this.Size = parentForm.Size;
-            if (showTime != null)
-            {
-                this.timer.Interval = showTime.Value.TotalMilliseconds;
-                this.timer.Enabled = true;
-            }
-
-            this.ShowDialog();
-        }
+        this.ShowDialog();
     }
 }

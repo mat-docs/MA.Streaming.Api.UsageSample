@@ -30,6 +30,8 @@
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FrmMain));
             groupBox1 = new GroupBox();
+            label32 = new Label();
+            numTxtPromtheusPort = new NumericUpDown();
             button1 = new Button();
             btnGoToDirectory = new Button();
             btnDeploy = new Button();
@@ -52,6 +54,12 @@
             grbSamples = new GroupBox();
             tabControl1 = new TabControl();
             tabPage1 = new TabPage();
+            groupBox14 = new GroupBox();
+            rtxbNotifications = new RichTextBox();
+            label29 = new Label();
+            txbNotificationDataSource = new TextBox();
+            btnSubscribeStopNotifications = new Button();
+            btnSubscribeStartNotifications = new Button();
             groupBox13 = new GroupBox();
             btnCompleteSession = new Button();
             label30 = new Label();
@@ -144,15 +152,15 @@
             label22 = new Label();
             label26 = new Label();
             txtPublishDataSource = new TextBox();
-            label32 = new Label();
-            numTxtPromtheusPort = new NumericUpDown();
             groupBox1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)numTxtPromtheusPort).BeginInit();
             ((System.ComponentModel.ISupportInitialize)grdPartitionMappings).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numTxtApiPort).BeginInit();
             panel1.SuspendLayout();
             grbSamples.SuspendLayout();
             tabControl1.SuspendLayout();
             tabPage1.SuspendLayout();
+            groupBox14.SuspendLayout();
             groupBox13.SuspendLayout();
             groupBox6.SuspendLayout();
             groupBox5.SuspendLayout();
@@ -174,7 +182,6 @@
             ((System.ComponentModel.ISupportInitialize)numTxtPublishMessageSize).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numTxtPublishTimes).BeginInit();
             pnlPublishReceiveInfo.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)numTxtPromtheusPort).BeginInit();
             SuspendLayout();
             // 
             // groupBox1
@@ -198,6 +205,24 @@
             groupBox1.TabIndex = 0;
             groupBox1.TabStop = false;
             groupBox1.Text = "Deployments";
+            // 
+            // label32
+            // 
+            label32.AutoSize = true;
+            label32.Location = new Point(10, 360);
+            label32.Name = "label32";
+            label32.Size = new Size(191, 15);
+            label32.TabIndex = 16;
+            label32.Text = "Stream API Promethus Metric Port:";
+            // 
+            // numTxtPromtheusPort
+            // 
+            numTxtPromtheusPort.Location = new Point(240, 356);
+            numTxtPromtheusPort.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
+            numTxtPromtheusPort.Name = "numTxtPromtheusPort";
+            numTxtPromtheusPort.Size = new Size(84, 23);
+            numTxtPromtheusPort.TabIndex = 17;
+            numTxtPromtheusPort.Value = new decimal(new int[] { 10010, 0, 0, 0 });
             // 
             // button1
             // 
@@ -401,7 +426,7 @@
             grbSamples.Enabled = false;
             grbSamples.Location = new Point(335, 0);
             grbSamples.Name = "grbSamples";
-            grbSamples.Size = new Size(812, 546);
+            grbSamples.Size = new Size(1043, 546);
             grbSamples.TabIndex = 1;
             grbSamples.TabStop = false;
             grbSamples.Text = "Samples (connect  to stream api  to get Enable)";
@@ -415,11 +440,16 @@
             tabControl1.Location = new Point(3, 19);
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
-            tabControl1.Size = new Size(806, 524);
+            tabControl1.Size = new Size(1037, 524);
             tabControl1.TabIndex = 0;
             // 
             // tabPage1
             // 
+            tabPage1.Controls.Add(groupBox14);
+            tabPage1.Controls.Add(label29);
+            tabPage1.Controls.Add(txbNotificationDataSource);
+            tabPage1.Controls.Add(btnSubscribeStopNotifications);
+            tabPage1.Controls.Add(btnSubscribeStartNotifications);
             tabPage1.Controls.Add(groupBox13);
             tabPage1.Controls.Add(groupBox6);
             tabPage1.Controls.Add(groupBox5);
@@ -429,10 +459,69 @@
             tabPage1.Location = new Point(4, 24);
             tabPage1.Name = "tabPage1";
             tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(798, 496);
+            tabPage1.Size = new Size(1029, 496);
             tabPage1.TabIndex = 0;
             tabPage1.Text = "Session Management";
             tabPage1.UseVisualStyleBackColor = true;
+            // 
+            // groupBox14
+            // 
+            groupBox14.Controls.Add(rtxbNotifications);
+            groupBox14.Location = new Point(661, 6);
+            groupBox14.Name = "groupBox14";
+            groupBox14.Size = new Size(362, 485);
+            groupBox14.TabIndex = 42;
+            groupBox14.TabStop = false;
+            groupBox14.Text = "Notifications";
+            // 
+            // rtxbNotifications
+            // 
+            rtxbNotifications.Location = new Point(6, 24);
+            rtxbNotifications.Name = "rtxbNotifications";
+            rtxbNotifications.ReadOnly = true;
+            rtxbNotifications.Size = new Size(350, 451);
+            rtxbNotifications.TabIndex = 32;
+            rtxbNotifications.Text = "";
+            // 
+            // label29
+            // 
+            label29.AutoSize = true;
+            label29.Location = new Point(16, 268);
+            label29.Name = "label29";
+            label29.Size = new Size(136, 15);
+            label29.TabIndex = 40;
+            label29.Text = "Notification Data Source";
+            // 
+            // txbNotificationDataSource
+            // 
+            txbNotificationDataSource.BorderStyle = BorderStyle.FixedSingle;
+            txbNotificationDataSource.Location = new Point(158, 266);
+            txbNotificationDataSource.Name = "txbNotificationDataSource";
+            txbNotificationDataSource.Size = new Size(173, 23);
+            txbNotificationDataSource.TabIndex = 41;
+            txbNotificationDataSource.Text = "SampleDataSource";
+            // 
+            // btnSubscribeStopNotifications
+            // 
+            btnSubscribeStopNotifications.BackColor = Color.Coral;
+            btnSubscribeStopNotifications.Location = new Point(501, 250);
+            btnSubscribeStopNotifications.Name = "btnSubscribeStopNotifications";
+            btnSubscribeStopNotifications.Size = new Size(156, 50);
+            btnSubscribeStopNotifications.TabIndex = 39;
+            btnSubscribeStopNotifications.Text = "Session Stop Notification";
+            btnSubscribeStopNotifications.UseVisualStyleBackColor = false;
+            btnSubscribeStopNotifications.Click += btnSubscribeStopNotification_Click;
+            // 
+            // btnSubscribeStartNotifications
+            // 
+            btnSubscribeStartNotifications.BackColor = Color.DarkKhaki;
+            btnSubscribeStartNotifications.Location = new Point(337, 251);
+            btnSubscribeStartNotifications.Name = "btnSubscribeStartNotifications";
+            btnSubscribeStartNotifications.Size = new Size(158, 50);
+            btnSubscribeStartNotifications.TabIndex = 38;
+            btnSubscribeStartNotifications.Text = "New Session Notification";
+            btnSubscribeStartNotifications.UseVisualStyleBackColor = false;
+            btnSubscribeStartNotifications.Click += btnSubscribeStartNotification_Click;
             // 
             // groupBox13
             // 
@@ -442,14 +531,14 @@
             groupBox13.FlatStyle = FlatStyle.Flat;
             groupBox13.Location = new Point(9, 192);
             groupBox13.Name = "groupBox13";
-            groupBox13.Size = new Size(741, 58);
+            groupBox13.Size = new Size(641, 58);
             groupBox13.TabIndex = 37;
             groupBox13.TabStop = false;
             groupBox13.Text = "Completing The Session";
             // 
             // btnCompleteSession
             // 
-            btnCompleteSession.Location = new Point(634, 22);
+            btnCompleteSession.Location = new Point(529, 22);
             btnCompleteSession.Name = "btnCompleteSession";
             btnCompleteSession.Size = new Size(100, 23);
             btnCompleteSession.TabIndex = 21;
@@ -471,7 +560,7 @@
             txtCompleteSessionSessionKey.BorderStyle = BorderStyle.FixedSingle;
             txtCompleteSessionSessionKey.Location = new Point(81, 22);
             txtCompleteSessionSessionKey.Name = "txtCompleteSessionSessionKey";
-            txtCompleteSessionSessionKey.Size = new Size(313, 23);
+            txtCompleteSessionSessionKey.Size = new Size(442, 23);
             txtCompleteSessionSessionKey.TabIndex = 28;
             // 
             // groupBox6
@@ -480,27 +569,27 @@
             groupBox6.Controls.Add(btnGetSessionInfo);
             groupBox6.Controls.Add(txtGetSessionInfoSessionKey);
             groupBox6.Controls.Add(label5);
-            groupBox6.Location = new Point(329, 254);
+            groupBox6.Location = new Point(316, 307);
             groupBox6.Name = "groupBox6";
-            groupBox6.Size = new Size(421, 233);
+            groupBox6.Size = new Size(339, 184);
             groupBox6.TabIndex = 36;
             groupBox6.TabStop = false;
             groupBox6.Text = "Get Session Info";
             // 
             // rtxbSessionInfo
             // 
-            rtxbSessionInfo.Location = new Point(6, 58);
+            rtxbSessionInfo.Location = new Point(6, 51);
             rtxbSessionInfo.Name = "rtxbSessionInfo";
             rtxbSessionInfo.ReadOnly = true;
-            rtxbSessionInfo.Size = new Size(408, 169);
+            rtxbSessionInfo.Size = new Size(328, 123);
             rtxbSessionInfo.TabIndex = 32;
             rtxbSessionInfo.Text = "";
             // 
             // btnGetSessionInfo
             // 
-            btnGetSessionInfo.Location = new Point(314, 24);
+            btnGetSessionInfo.Location = new Point(259, 26);
             btnGetSessionInfo.Name = "btnGetSessionInfo";
-            btnGetSessionInfo.Size = new Size(101, 23);
+            btnGetSessionInfo.Size = new Size(75, 23);
             btnGetSessionInfo.TabIndex = 31;
             btnGetSessionInfo.Text = "Get ";
             btnGetSessionInfo.UseVisualStyleBackColor = true;
@@ -511,7 +600,7 @@
             txtGetSessionInfoSessionKey.BorderStyle = BorderStyle.FixedSingle;
             txtGetSessionInfoSessionKey.Location = new Point(81, 24);
             txtGetSessionInfoSessionKey.Name = "txtGetSessionInfoSessionKey";
-            txtGetSessionInfoSessionKey.Size = new Size(212, 23);
+            txtGetSessionInfoSessionKey.Size = new Size(172, 23);
             txtGetSessionInfoSessionKey.TabIndex = 30;
             // 
             // label5
@@ -529,25 +618,25 @@
             groupBox5.Controls.Add(btnGetSessionKeys);
             groupBox5.Controls.Add(txtGetSessionKeysDataSource);
             groupBox5.Controls.Add(label11);
-            groupBox5.Location = new Point(9, 254);
+            groupBox5.Location = new Point(9, 305);
             groupBox5.Name = "groupBox5";
-            groupBox5.Size = new Size(314, 233);
+            groupBox5.Size = new Size(301, 186);
             groupBox5.TabIndex = 35;
             groupBox5.TabStop = false;
             groupBox5.Text = "Get Session Keys";
             // 
             // rtxbSessionKeys
             // 
-            rtxbSessionKeys.Location = new Point(7, 58);
+            rtxbSessionKeys.Location = new Point(6, 53);
             rtxbSessionKeys.Name = "rtxbSessionKeys";
             rtxbSessionKeys.ReadOnly = true;
-            rtxbSessionKeys.Size = new Size(290, 169);
+            rtxbSessionKeys.Size = new Size(280, 123);
             rtxbSessionKeys.TabIndex = 33;
             rtxbSessionKeys.Text = "";
             // 
             // btnGetSessionKeys
             // 
-            btnGetSessionKeys.Location = new Point(225, 24);
+            btnGetSessionKeys.Location = new Point(214, 20);
             btnGetSessionKeys.Name = "btnGetSessionKeys";
             btnGetSessionKeys.Size = new Size(72, 23);
             btnGetSessionKeys.TabIndex = 31;
@@ -560,7 +649,7 @@
             txtGetSessionKeysDataSource.BorderStyle = BorderStyle.FixedSingle;
             txtGetSessionKeysDataSource.Location = new Point(81, 24);
             txtGetSessionKeysDataSource.Name = "txtGetSessionKeysDataSource";
-            txtGetSessionKeysDataSource.Size = new Size(138, 23);
+            txtGetSessionKeysDataSource.Size = new Size(127, 23);
             txtGetSessionKeysDataSource.TabIndex = 30;
             txtGetSessionKeysDataSource.Text = "SampleDataSource";
             // 
@@ -583,7 +672,7 @@
             groupBox4.FlatStyle = FlatStyle.Flat;
             groupBox4.Location = new Point(9, 130);
             groupBox4.Name = "groupBox4";
-            groupBox4.Size = new Size(741, 58);
+            groupBox4.Size = new Size(641, 58);
             groupBox4.TabIndex = 34;
             groupBox4.TabStop = false;
             groupBox4.Text = "Update Session Identifier";
@@ -593,12 +682,12 @@
             txtUpdateIdentifierNewIdentifier.BorderStyle = BorderStyle.FixedSingle;
             txtUpdateIdentifierNewIdentifier.Location = new Point(350, 22);
             txtUpdateIdentifierNewIdentifier.Name = "txtUpdateIdentifierNewIdentifier";
-            txtUpdateIdentifierNewIdentifier.Size = new Size(263, 23);
+            txtUpdateIdentifierNewIdentifier.Size = new Size(173, 23);
             txtUpdateIdentifierNewIdentifier.TabIndex = 26;
             // 
             // btnUpdateIdentifier
             // 
-            btnUpdateIdentifier.Location = new Point(634, 22);
+            btnUpdateIdentifier.Location = new Point(529, 22);
             btnUpdateIdentifier.Name = "btnUpdateIdentifier";
             btnUpdateIdentifier.Size = new Size(100, 23);
             btnUpdateIdentifier.TabIndex = 21;
@@ -643,7 +732,7 @@
             groupBox3.ForeColor = SystemColors.ControlText;
             groupBox3.Location = new Point(8, 68);
             groupBox3.Name = "groupBox3";
-            groupBox3.Size = new Size(741, 58);
+            groupBox3.Size = new Size(642, 58);
             groupBox3.TabIndex = 33;
             groupBox3.TabStop = false;
             groupBox3.Text = "Add Associated Session Key";
@@ -670,12 +759,12 @@
             txtAddAssociateAssociateKey.BorderStyle = BorderStyle.FixedSingle;
             txtAddAssociateAssociateKey.Location = new Point(351, 26);
             txtAddAssociateAssociateKey.Name = "txtAddAssociateAssociateKey";
-            txtAddAssociateAssociateKey.Size = new Size(263, 23);
+            txtAddAssociateAssociateKey.Size = new Size(173, 23);
             txtAddAssociateAssociateKey.TabIndex = 12;
             // 
             // btnAddAssociateKey
             // 
-            btnAddAssociateKey.Location = new Point(635, 26);
+            btnAddAssociateKey.Location = new Point(530, 24);
             btnAddAssociateKey.Name = "btnAddAssociateKey";
             btnAddAssociateKey.Size = new Size(100, 23);
             btnAddAssociateKey.TabIndex = 13;
@@ -704,14 +793,14 @@
             groupBox2.FlatStyle = FlatStyle.Flat;
             groupBox2.Location = new Point(8, 6);
             groupBox2.Name = "groupBox2";
-            groupBox2.Size = new Size(741, 58);
+            groupBox2.Size = new Size(642, 58);
             groupBox2.TabIndex = 32;
             groupBox2.TabStop = false;
             groupBox2.Text = "Session Creation";
             // 
             // btnCreateNewSession
             // 
-            btnCreateNewSession.Location = new Point(635, 25);
+            btnCreateNewSession.Location = new Point(530, 22);
             btnCreateNewSession.Name = "btnCreateNewSession";
             btnCreateNewSession.Size = new Size(100, 23);
             btnCreateNewSession.TabIndex = 6;
@@ -751,14 +840,14 @@
             txtCreateSessionType.BorderStyle = BorderStyle.FixedSingle;
             txtCreateSessionType.Location = new Point(295, 25);
             txtCreateSessionType.Name = "txtCreateSessionType";
-            txtCreateSessionType.Size = new Size(192, 23);
+            txtCreateSessionType.Size = new Size(117, 23);
             txtCreateSessionType.TabIndex = 16;
             txtCreateSessionType.Text = "SampleSession";
             // 
             // lblSessionVersion
             // 
             lblSessionVersion.AutoSize = true;
-            lblSessionVersion.Location = new Point(512, 29);
+            lblSessionVersion.Location = new Point(418, 29);
             lblSessionVersion.Name = "lblSessionVersion";
             lblSessionVersion.Size = new Size(45, 15);
             lblSessionVersion.TabIndex = 17;
@@ -766,7 +855,7 @@
             // 
             // numTxtCreateSessionVersion
             // 
-            numTxtCreateSessionVersion.Location = new Point(563, 25);
+            numTxtCreateSessionVersion.Location = new Point(469, 25);
             numTxtCreateSessionVersion.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
             numTxtCreateSessionVersion.Name = "numTxtCreateSessionVersion";
             numTxtCreateSessionVersion.Size = new Size(51, 23);
@@ -783,7 +872,7 @@
             tabPage2.Location = new Point(4, 24);
             tabPage2.Name = "tabPage2";
             tabPage2.Padding = new Padding(3);
-            tabPage2.Size = new Size(798, 496);
+            tabPage2.Size = new Size(1029, 496);
             tabPage2.TabIndex = 1;
             tabPage2.Text = "Data Format Management";
             tabPage2.UseVisualStyleBackColor = true;
@@ -795,9 +884,9 @@
             groupBox11.Controls.Add(rtxtAllDefinitionPackets);
             groupBox11.Controls.Add(btnGetAllDefinitionPacket);
             groupBox11.FlatStyle = FlatStyle.Flat;
-            groupBox11.Location = new Point(464, 149);
+            groupBox11.Location = new Point(699, 17);
             groupBox11.Name = "groupBox11";
-            groupBox11.Size = new Size(305, 332);
+            groupBox11.Size = new Size(305, 473);
             groupBox11.TabIndex = 37;
             groupBox11.TabStop = false;
             groupBox11.Text = "Get All Definition Packet";
@@ -825,7 +914,7 @@
             rtxtAllDefinitionPackets.Location = new Point(6, 104);
             rtxtAllDefinitionPackets.Name = "rtxtAllDefinitionPackets";
             rtxtAllDefinitionPackets.ReadOnly = true;
-            rtxtAllDefinitionPackets.Size = new Size(293, 235);
+            rtxtAllDefinitionPackets.Size = new Size(293, 358);
             rtxtAllDefinitionPackets.TabIndex = 37;
             rtxtAllDefinitionPackets.Text = "";
             // 
@@ -848,9 +937,9 @@
             groupBox9.Controls.Add(label16);
             groupBox9.Controls.Add(txtGetParameterListDataSource);
             groupBox9.FlatStyle = FlatStyle.Flat;
-            groupBox9.Location = new Point(235, 136);
+            groupBox9.Location = new Point(336, 153);
             groupBox9.Name = "groupBox9";
-            groupBox9.Size = new Size(223, 332);
+            groupBox9.Size = new Size(341, 332);
             groupBox9.TabIndex = 36;
             groupBox9.TabStop = false;
             groupBox9.Text = "Get Parameter List";
@@ -860,7 +949,7 @@
             rtxtGetParameterListFetchedParameterList.Location = new Point(6, 146);
             rtxtGetParameterListFetchedParameterList.Name = "rtxtGetParameterListFetchedParameterList";
             rtxtGetParameterListFetchedParameterList.ReadOnly = true;
-            rtxtGetParameterListFetchedParameterList.Size = new Size(202, 178);
+            rtxtGetParameterListFetchedParameterList.Size = new Size(318, 178);
             rtxtGetParameterListFetchedParameterList.TabIndex = 37;
             rtxtGetParameterListFetchedParameterList.Text = "";
             // 
@@ -878,12 +967,12 @@
             txtGetParameterListDataFormatId.BorderStyle = BorderStyle.FixedSingle;
             txtGetParameterListDataFormatId.Location = new Point(79, 79);
             txtGetParameterListDataFormatId.Name = "txtGetParameterListDataFormatId";
-            txtGetParameterListDataFormatId.Size = new Size(129, 23);
+            txtGetParameterListDataFormatId.Size = new Size(245, 23);
             txtGetParameterListDataFormatId.TabIndex = 20;
             // 
             // btnGetParameterList
             // 
-            btnGetParameterList.Location = new Point(65, 117);
+            btnGetParameterList.Location = new Point(79, 117);
             btnGetParameterList.Name = "btnGetParameterList";
             btnGetParameterList.Size = new Size(100, 23);
             btnGetParameterList.TabIndex = 6;
@@ -905,7 +994,7 @@
             txtGetParameterListDataSource.BorderStyle = BorderStyle.FixedSingle;
             txtGetParameterListDataSource.Location = new Point(79, 39);
             txtGetParameterListDataSource.Name = "txtGetParameterListDataSource";
-            txtGetParameterListDataSource.Size = new Size(129, 23);
+            txtGetParameterListDataSource.Size = new Size(245, 23);
             txtGetParameterListDataSource.TabIndex = 5;
             txtGetParameterListDataSource.Text = "SampleDataSource";
             // 
@@ -917,9 +1006,9 @@
             groupBox10.Controls.Add(txtGetParamDataFormatFetchedDataFormat);
             groupBox10.Controls.Add(txtGetParamDataFormatDataSource);
             groupBox10.FlatStyle = FlatStyle.Flat;
-            groupBox10.Location = new Point(6, 136);
+            groupBox10.Location = new Point(12, 153);
             groupBox10.Name = "groupBox10";
-            groupBox10.Size = new Size(223, 332);
+            groupBox10.Size = new Size(318, 332);
             groupBox10.TabIndex = 35;
             groupBox10.TabStop = false;
             groupBox10.Text = "Get Parameter List Data Format Id";
@@ -932,7 +1021,7 @@
             grdGetParamDataFormatParamList.Name = "grdGetParamDataFormatParamList";
             grdGetParamDataFormatParamList.RowHeadersWidth = 25;
             grdGetParamDataFormatParamList.RowTemplate.Height = 25;
-            grdGetParamDataFormatParamList.Size = new Size(203, 185);
+            grdGetParamDataFormatParamList.Size = new Size(301, 185);
             grdGetParamDataFormatParamList.TabIndex = 18;
             // 
             // ColParamForDataFormat
@@ -943,7 +1032,7 @@
             // 
             // btnGetParamDataFormat
             // 
-            btnGetParamDataFormat.Location = new Point(48, 274);
+            btnGetParamDataFormat.Location = new Point(91, 274);
             btnGetParamDataFormat.Name = "btnGetParamDataFormat";
             btnGetParamDataFormat.Size = new Size(100, 23);
             btnGetParamDataFormat.TabIndex = 6;
@@ -966,7 +1055,7 @@
             txtGetParamDataFormatFetchedDataFormat.Location = new Point(6, 303);
             txtGetParamDataFormatFetchedDataFormat.Name = "txtGetParamDataFormatFetchedDataFormat";
             txtGetParamDataFormatFetchedDataFormat.ReadOnly = true;
-            txtGetParamDataFormatFetchedDataFormat.Size = new Size(203, 23);
+            txtGetParamDataFormatFetchedDataFormat.Size = new Size(301, 23);
             txtGetParamDataFormatFetchedDataFormat.TabIndex = 17;
             // 
             // txtGetParamDataFormatDataSource
@@ -974,7 +1063,7 @@
             txtGetParamDataFormatDataSource.BorderStyle = BorderStyle.FixedSingle;
             txtGetParamDataFormatDataSource.Location = new Point(80, 39);
             txtGetParamDataFormatDataSource.Name = "txtGetParamDataFormatDataSource";
-            txtGetParamDataFormatDataSource.Size = new Size(129, 23);
+            txtGetParamDataFormatDataSource.Size = new Size(227, 23);
             txtGetParamDataFormatDataSource.TabIndex = 5;
             txtGetParamDataFormatDataSource.Text = "SampleDataSource";
             // 
@@ -989,7 +1078,7 @@
             groupBox8.FlatStyle = FlatStyle.Flat;
             groupBox8.Location = new Point(6, 72);
             groupBox8.Name = "groupBox8";
-            groupBox8.Size = new Size(741, 58);
+            groupBox8.Size = new Size(671, 58);
             groupBox8.TabIndex = 34;
             groupBox8.TabStop = false;
             groupBox8.Text = "Get Event ";
@@ -997,15 +1086,15 @@
             // txtGetEventFetchedEvent
             // 
             txtGetEventFetchedEvent.BorderStyle = BorderStyle.FixedSingle;
-            txtGetEventFetchedEvent.Location = new Point(594, 25);
+            txtGetEventFetchedEvent.Location = new Point(551, 23);
             txtGetEventFetchedEvent.Name = "txtGetEventFetchedEvent";
             txtGetEventFetchedEvent.ReadOnly = true;
-            txtGetEventFetchedEvent.Size = new Size(147, 23);
+            txtGetEventFetchedEvent.Size = new Size(88, 23);
             txtGetEventFetchedEvent.TabIndex = 17;
             // 
             // btnGetEvent
             // 
-            btnGetEvent.Location = new Point(485, 25);
+            btnGetEvent.Location = new Point(445, 23);
             btnGetEvent.Name = "btnGetEvent";
             btnGetEvent.Size = new Size(100, 23);
             btnGetEvent.TabIndex = 6;
@@ -1045,7 +1134,7 @@
             txtGetEventDataFormatId.BorderStyle = BorderStyle.FixedSingle;
             txtGetEventDataFormatId.Location = new Point(319, 25);
             txtGetEventDataFormatId.Name = "txtGetEventDataFormatId";
-            txtGetEventDataFormatId.Size = new Size(147, 23);
+            txtGetEventDataFormatId.Size = new Size(120, 23);
             txtGetEventDataFormatId.TabIndex = 16;
             // 
             // groupBox7
@@ -1059,7 +1148,7 @@
             groupBox7.FlatStyle = FlatStyle.Flat;
             groupBox7.Location = new Point(6, 8);
             groupBox7.Name = "groupBox7";
-            groupBox7.Size = new Size(741, 58);
+            groupBox7.Size = new Size(671, 58);
             groupBox7.TabIndex = 33;
             groupBox7.TabStop = false;
             groupBox7.Text = "Get Event Data Format Id";
@@ -1067,15 +1156,15 @@
             // txtGetEventFormatIdFetchedDataFormat
             // 
             txtGetEventFormatIdFetchedDataFormat.BorderStyle = BorderStyle.FixedSingle;
-            txtGetEventFormatIdFetchedDataFormat.Location = new Point(594, 25);
+            txtGetEventFormatIdFetchedDataFormat.Location = new Point(551, 25);
             txtGetEventFormatIdFetchedDataFormat.Name = "txtGetEventFormatIdFetchedDataFormat";
             txtGetEventFormatIdFetchedDataFormat.ReadOnly = true;
-            txtGetEventFormatIdFetchedDataFormat.Size = new Size(147, 23);
+            txtGetEventFormatIdFetchedDataFormat.Size = new Size(88, 23);
             txtGetEventFormatIdFetchedDataFormat.TabIndex = 17;
             // 
             // btnGetEventFormatId
             // 
-            btnGetEventFormatId.Location = new Point(485, 25);
+            btnGetEventFormatId.Location = new Point(445, 25);
             btnGetEventFormatId.Name = "btnGetEventFormatId";
             btnGetEventFormatId.Size = new Size(100, 23);
             btnGetEventFormatId.TabIndex = 6;
@@ -1115,7 +1204,7 @@
             txtGetEventFormatIdEventIdentifier.BorderStyle = BorderStyle.FixedSingle;
             txtGetEventFormatIdEventIdentifier.Location = new Point(319, 25);
             txtGetEventFormatIdEventIdentifier.Name = "txtGetEventFormatIdEventIdentifier";
-            txtGetEventFormatIdEventIdentifier.Size = new Size(147, 23);
+            txtGetEventFormatIdEventIdentifier.Size = new Size(120, 23);
             txtGetEventFormatIdEventIdentifier.TabIndex = 16;
             txtGetEventFormatIdEventIdentifier.Text = "event1";
             // 
@@ -1125,7 +1214,7 @@
             tabPage3.Location = new Point(4, 24);
             tabPage3.Name = "tabPage3";
             tabPage3.Padding = new Padding(3);
-            tabPage3.Size = new Size(798, 496);
+            tabPage3.Size = new Size(1029, 496);
             tabPage3.TabIndex = 2;
             tabPage3.Text = "ReadAndWriteManagement";
             tabPage3.UseVisualStyleBackColor = true;
@@ -1144,7 +1233,7 @@
             groupBox12.FlatStyle = FlatStyle.Flat;
             groupBox12.Location = new Point(3, 3);
             groupBox12.Name = "groupBox12";
-            groupBox12.Size = new Size(792, 490);
+            groupBox12.Size = new Size(1023, 490);
             groupBox12.TabIndex = 33;
             groupBox12.TabStop = false;
             groupBox12.Text = "Publish/Subscribe";
@@ -1160,10 +1249,10 @@
             // 
             // rtxtRunInfoResults
             // 
-            rtxtRunInfoResults.Location = new Point(440, 258);
+            rtxtRunInfoResults.Location = new Point(460, 258);
             rtxtRunInfoResults.Name = "rtxtRunInfoResults";
             rtxtRunInfoResults.ReadOnly = true;
-            rtxtRunInfoResults.Size = new Size(343, 230);
+            rtxtRunInfoResults.Size = new Size(547, 230);
             rtxtRunInfoResults.TabIndex = 45;
             rtxtRunInfoResults.Text = "";
             // 
@@ -1181,7 +1270,7 @@
             rtxtLog.Location = new Point(3, 258);
             rtxtLog.Name = "rtxtLog";
             rtxtLog.ReadOnly = true;
-            rtxtLog.Size = new Size(283, 229);
+            rtxtLog.Size = new Size(317, 229);
             rtxtLog.TabIndex = 43;
             rtxtLog.Text = "";
             // 
@@ -1189,16 +1278,16 @@
             // 
             lstRunInfo.FormattingEnabled = true;
             lstRunInfo.ItemHeight = 15;
-            lstRunInfo.Location = new Point(292, 258);
+            lstRunInfo.Location = new Point(326, 258);
             lstRunInfo.Name = "lstRunInfo";
-            lstRunInfo.Size = new Size(142, 229);
+            lstRunInfo.Size = new Size(128, 229);
             lstRunInfo.TabIndex = 42;
             lstRunInfo.MouseDoubleClick += lstRunInfo_MouseDoubleClick;
             // 
             // label25
             // 
             label25.AutoSize = true;
-            label25.Location = new Point(292, 240);
+            label25.Location = new Point(326, 240);
             label25.Name = "label25";
             label25.Size = new Size(52, 15);
             label25.TabIndex = 39;
@@ -1208,7 +1297,7 @@
             // 
             label23.Location = new Point(3, 19);
             label23.Name = "label23";
-            label23.Size = new Size(750, 85);
+            label23.Size = new Size(1001, 85);
             label23.TabIndex = 19;
             label23.Text = resources.GetString("label23.Text");
             // 
@@ -1218,7 +1307,7 @@
             grbPublish.Controls.Add(pnlPublishReceiveInfo);
             grbPublish.Location = new Point(6, 101);
             grbPublish.Name = "grbPublish";
-            grbPublish.Size = new Size(780, 136);
+            grbPublish.Size = new Size(1001, 136);
             grbPublish.TabIndex = 47;
             grbPublish.TabStop = false;
             grbPublish.Text = "Publish Settings";
@@ -1232,15 +1321,15 @@
             pnlPublishAction.Controls.Add(chbPublishAsBatch);
             pnlPublishAction.Controls.Add(numTxtPublishTimes);
             pnlPublishAction.Dock = DockStyle.Fill;
-            pnlPublishAction.Location = new Point(268, 19);
+            pnlPublishAction.Location = new Point(237, 19);
             pnlPublishAction.Name = "pnlPublishAction";
-            pnlPublishAction.Size = new Size(509, 114);
+            pnlPublishAction.Size = new Size(761, 114);
             pnlPublishAction.TabIndex = 43;
             // 
             // label20
             // 
             label20.AutoSize = true;
-            label20.Location = new Point(39, 47);
+            label20.Location = new Point(197, 47);
             label20.Name = "label20";
             label20.Size = new Size(112, 15);
             label20.TabIndex = 17;
@@ -1248,7 +1337,7 @@
             // 
             // btnPublish
             // 
-            btnPublish.Location = new Point(39, 81);
+            btnPublish.Location = new Point(613, 43);
             btnPublish.Name = "btnPublish";
             btnPublish.Size = new Size(121, 23);
             btnPublish.TabIndex = 6;
@@ -1259,7 +1348,7 @@
             // label24
             // 
             label24.AutoSize = true;
-            label24.Location = new Point(236, 47);
+            label24.Location = new Point(394, 47);
             label24.Name = "label24";
             label24.Size = new Size(121, 15);
             label24.TabIndex = 25;
@@ -1267,7 +1356,7 @@
             // 
             // numTxtPublishMessageSize
             // 
-            numTxtPublishMessageSize.Location = new Point(157, 43);
+            numTxtPublishMessageSize.Location = new Point(315, 43);
             numTxtPublishMessageSize.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
             numTxtPublishMessageSize.Name = "numTxtPublishMessageSize";
             numTxtPublishMessageSize.Size = new Size(73, 23);
@@ -1277,7 +1366,7 @@
             // chbPublishAsBatch
             // 
             chbPublishAsBatch.AutoSize = true;
-            chbPublishAsBatch.Location = new Point(39, 7);
+            chbPublishAsBatch.Location = new Point(39, 46);
             chbPublishAsBatch.Name = "chbPublishAsBatch";
             chbPublishAsBatch.Size = new Size(152, 19);
             chbPublishAsBatch.TabIndex = 27;
@@ -1286,10 +1375,10 @@
             // 
             // numTxtPublishTimes
             // 
-            numTxtPublishTimes.Location = new Point(363, 43);
+            numTxtPublishTimes.Location = new Point(521, 43);
             numTxtPublishTimes.Maximum = new decimal(new int[] { 100000000, 0, 0, 0 });
             numTxtPublishTimes.Name = "numTxtPublishTimes";
-            numTxtPublishTimes.Size = new Size(116, 23);
+            numTxtPublishTimes.Size = new Size(76, 23);
             numTxtPublishTimes.TabIndex = 24;
             numTxtPublishTimes.Value = new decimal(new int[] { 1000000, 0, 0, 0 });
             // 
@@ -1304,7 +1393,7 @@
             pnlPublishReceiveInfo.Dock = DockStyle.Left;
             pnlPublishReceiveInfo.Location = new Point(3, 19);
             pnlPublishReceiveInfo.Name = "pnlPublishReceiveInfo";
-            pnlPublishReceiveInfo.Size = new Size(265, 114);
+            pnlPublishReceiveInfo.Size = new Size(234, 114);
             pnlPublishReceiveInfo.TabIndex = 42;
             // 
             // label21
@@ -1361,29 +1450,11 @@
             txtPublishDataSource.TabIndex = 5;
             txtPublishDataSource.Text = "SampleDataSource";
             // 
-            // label32
-            // 
-            label32.AutoSize = true;
-            label32.Location = new Point(10, 360);
-            label32.Name = "label32";
-            label32.Size = new Size(191, 15);
-            label32.TabIndex = 16;
-            label32.Text = "Stream API Promethus Metric Port:";
-            // 
-            // numTxtPromtheusPort
-            // 
-            numTxtPromtheusPort.Location = new Point(240, 356);
-            numTxtPromtheusPort.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
-            numTxtPromtheusPort.Name = "numTxtPromtheusPort";
-            numTxtPromtheusPort.Size = new Size(84, 23);
-            numTxtPromtheusPort.TabIndex = 17;
-            numTxtPromtheusPort.Value = new decimal(new int[] { 10010, 0, 0, 0 });
-            // 
             // FrmMain
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1147, 546);
+            ClientSize = new Size(1378, 546);
             Controls.Add(grbSamples);
             Controls.Add(groupBox1);
             Name = "FrmMain";
@@ -1391,6 +1462,7 @@
             Load += Form1_Load;
             groupBox1.ResumeLayout(false);
             groupBox1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)numTxtPromtheusPort).EndInit();
             ((System.ComponentModel.ISupportInitialize)grdPartitionMappings).EndInit();
             ((System.ComponentModel.ISupportInitialize)numTxtApiPort).EndInit();
             panel1.ResumeLayout(false);
@@ -1398,6 +1470,8 @@
             grbSamples.ResumeLayout(false);
             tabControl1.ResumeLayout(false);
             tabPage1.ResumeLayout(false);
+            tabPage1.PerformLayout();
+            groupBox14.ResumeLayout(false);
             groupBox13.ResumeLayout(false);
             groupBox13.PerformLayout();
             groupBox6.ResumeLayout(false);
@@ -1433,7 +1507,6 @@
             ((System.ComponentModel.ISupportInitialize)numTxtPublishTimes).EndInit();
             pnlPublishReceiveInfo.ResumeLayout(false);
             pnlPublishReceiveInfo.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)numTxtPromtheusPort).EndInit();
             ResumeLayout(false);
         }
 
@@ -1552,12 +1625,16 @@
         private Panel pnlPublishAction;
         private CheckBox chbPublishAsBatch;
         private GroupBox groupBox13;
-        private TextBox textBox1;
+        private TextBox txbNotificationDataSource;
         private Button btnCompleteSession;
         private Label label29;
         private Label label30;
         private TextBox txtCompleteSessionSessionKey;
         private Label label32;
         private NumericUpDown numTxtPromtheusPort;
+        private Button btnSubscribeStartNotifications;
+        private Button btnSubscribeStopNotifications;
+        private GroupBox groupBox14;
+        private RichTextBox rtxbNotifications;
     }
 }

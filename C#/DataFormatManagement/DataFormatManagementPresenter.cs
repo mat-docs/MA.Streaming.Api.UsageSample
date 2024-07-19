@@ -7,16 +7,17 @@ using MA.Common.Abstractions;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
 using MA.Streaming.OpenData;
+using MA.Streaming.Proto.Core.Providers;
 
 namespace MA.Streaming.Api.UsageSample.DataFormatManagement;
 
 internal interface IDataFormatManagementPresenterListener
 {
-    void OnEventDataFormatFetched(string dataSource, string eventIdentifier, string responseDataFormat);
+    void OnEventDataFormatFetched(string dataSource, string eventIdentifier, ulong dataFormatIdentifier);
 
     void OnEventFetched(string dataSource, string responseEvent);
 
-    void OnParameterListDataFormatFetched(string dataSource, IReadOnlyList<string> parameterIdentifiers, string responseDataFormat);
+    void OnParameterListDataFormatFetched(string dataSource, IReadOnlyList<string> parameterIdentifiers, ulong dataFormatIdentifier);
 
     void OnParameterListFetched(string dataSource, IReadOnlyList<string> responseParameters);
 
@@ -67,9 +68,9 @@ internal class DataFormatManagementPresenter
         try
         {
             var response = this.dataFormatManagerServiceClient.GetEventDataFormatId(eventDataFormatIdRequest);
-            if (!string.IsNullOrEmpty(response.DataFormat))
+            if (response.DataFormatIdentifier > 0)
             {
-                this.listener.OnEventDataFormatFetched(dataSource, eventIdentifier, response.DataFormat);
+                this.listener.OnEventDataFormatFetched(dataSource, eventIdentifier, response.DataFormatIdentifier);
             }
         }
         catch (Exception ex)
@@ -95,7 +96,7 @@ internal class DataFormatManagementPresenter
         var getEventRequest = new GetEventRequest
         {
             DataSource = dataSource,
-            DataFormat = dataFormatId
+            DataFormatIdentifier = ulong.Parse(dataFormatId)
         };
         try
         {
@@ -136,9 +137,9 @@ internal class DataFormatManagementPresenter
         try
         {
             var response = this.dataFormatManagerServiceClient.GetParameterDataFormatId(parameterDataFormatIdRequest);
-            if (!string.IsNullOrEmpty(response.DataFormat))
+            if (response.DataFormatIdentifier > 0)
             {
-                this.listener.OnParameterListDataFormatFetched(dataSource, parameterIdentifiers, response.DataFormat);
+                this.listener.OnParameterListDataFormatFetched(dataSource, parameterIdentifiers, response.DataFormatIdentifier);
             }
         }
         catch (Exception ex)
@@ -164,7 +165,7 @@ internal class DataFormatManagementPresenter
         var getParametersListRequest = new GetParametersListRequest
         {
             DataSource = dataSource,
-            DataFormat = dataFormatId
+            DataFormatIdentifier = ulong.Parse(dataFormatId)
         };
         try
         {
@@ -206,11 +207,12 @@ internal class DataFormatManagementPresenter
         {
             var lstPacketDefinitions = new List<DataFormatDefinitionPacket>();
             var readEssentialsStream = this.packetReaderServiceClient.ReadEssentials(readEssentialsRequest).ResponseStream;
+            var type = new TypeNameProvider().DataFormatDefinitionPacketTypeName;
             while (readEssentialsStream.MoveNext().Result)
             {
                 lstPacketDefinitions.AddRange(
                     from packetResponse in readEssentialsStream.Current.Response
-                    where packetResponse.Packet.Type == nameof(DataFormatDefinitionPacket)
+                    where packetResponse.Packet.Type == type
                     select DataFormatDefinitionPacket.Parser.ParseFrom(packetResponse.Packet.Content));
             }
 

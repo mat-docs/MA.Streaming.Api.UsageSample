@@ -14,7 +14,8 @@ internal class LatencyInfo
         this.RunInfo = runInfo;
     }
 
-    public long Id => RunInfo.RunId;
+    public long Id => this.RunInfo.RunId;
+
     public List<LatencyRecord> ReceiveLatencies { get; } = [];
 
     public List<LatencyRecord> PublishLatencies { get; } = [];
