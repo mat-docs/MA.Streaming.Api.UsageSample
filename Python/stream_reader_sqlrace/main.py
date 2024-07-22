@@ -69,19 +69,21 @@ class StreamReaderSql:
     async def read_essentials(self):
         async with grpc.aio.insecure_channel(self.grpc_address) as channel:
             packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
-            async for new_packet in packet_reader_stub.ReadEssentials(
+            async for essentials_packet_response in packet_reader_stub.ReadEssentials(
                 api_pb2.ReadEssentialsRequest(connection=self.connection)
             ):
                 logger.debug("New essential packet received.")
+                new_packet = essentials_packet_response.response[0].packet
                 await self.handle_new_packet(new_packet)
 
     async def read_packets(self):
         async with grpc.aio.insecure_channel(self.grpc_address) as channel:
             packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
-            async for new_packet in packet_reader_stub.ReadPackets(
+            async for new_packet_response in packet_reader_stub.ReadPackets(
                 api_pb2.ReadPacketsRequest(connection=self.connection)
             ):
                 logger.debug("New packet received.")
+                new_packet = new_packet_response.response[0].packet
                 await self.handle_new_packet(new_packet, True)
 
     async def handle_new_packet(
