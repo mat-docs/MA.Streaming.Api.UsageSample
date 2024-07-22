@@ -52,6 +52,7 @@ from MESL.SqlRace.Domain import (  # .NET imports, so pylint: disable=wrong-impo
     ConfigurationSetAlreadyExistsException,
     Parameter,
     Channel,
+    DatabaseConnectionInformation,
 )
 from MESL.SqlRace.Enumerators import (  # .NET imports, so pylint: disable=wrong-import-position,wrong-import-order,import-error
     DataType,
@@ -95,16 +96,26 @@ class AtlasSessionWriter:
             None, config is created and committed to the session.
         """
         logger.debug("Creating new config.")
-        config_identifier = (
-            packet.config_id
-        )  # .NET objects, so pylint: disable=invalid-name
-        config_decription = "SessionFrame generated config"
+        config_identifier = packet.config_id
+        config_description = "Stream API generated config"
         configSetManager = (  # .NET objects, so pylint: disable=invalid-name
             ConfigurationSetManager.CreateConfigurationSetManager()
         )
 
+        # if we have processed this config previously then we can just use it
+        if configSetManager.Exists(
+            DatabaseConnectionInformation(self.session.ConnectionString),
+            config_identifier,
+        ):
+            logger.info(
+                "Logging config already exist, skip reprocessing logging config. Config identifier: %s",
+                config_identifier,
+            )
+            self.session.UseLoggingConfigurationSet(config_identifier)
+            return
+
         config = configSetManager.Create(
-            self.session.ConnectionString, config_identifier, config_decription
+            self.session.ConnectionString, config_identifier, config_description
         )
 
         # Create 1to1 conversion
