@@ -188,9 +188,7 @@ class StreamReaderSql:
                 break
 
         session_info_response = session_management_stub.GetSessionInfo(
-            api_pb2.GetSessionInfoRequest(
-                session_key=self.session_key
-            )
+            api_pb2.GetSessionInfoRequest(session_key=self.session_key)
         )
 
         # Establish a new connection

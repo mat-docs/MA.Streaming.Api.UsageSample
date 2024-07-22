@@ -124,9 +124,7 @@ class AtlasSessionWriter:
             group1 = ParameterGroup(app, app)
             config.AddParameterGroup(group1)
             # .NET objects, so pylint: disable=invalid-name
-            parameterGroupIds = NETList[
-                String
-            ]()
+            parameterGroupIds = NETList[String]()
             parameterGroupIds.Add(group1.Identifier)
             # .NET objects, so pylint: disable=invalid-name
             applicationGroup = ApplicationGroup(

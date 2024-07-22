@@ -1,4 +1,5 @@
 """All the Stream API services organised in a single class."""
+
 import grpc
 
 from ma.streaming.api.v1 import api_pb2_grpc
@@ -6,6 +7,7 @@ from ma.streaming.api.v1 import api_pb2_grpc
 
 class StreamApi:
     """All the Stream API services organised in a single class."""
+
     def __init__(self, address="localhost:13579"):
         self.channel = grpc.insecure_channel(address)
 
