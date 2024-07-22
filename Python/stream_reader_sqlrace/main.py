@@ -1,6 +1,6 @@
 """Read data packets from broker via the Stream API and write to a ATLAS session
 
-This example demonstrated how to consume data from the broker via the Stream API.
+This example demonstrates how to consume data from the broker via the Stream API.
 The example will read packets for an ongoing session, and write the contents to an
 ATLAS Session.
 If there are no ongoing session, it will wait until a new one starts.
@@ -84,11 +84,19 @@ class StreamReaderSql:
                 logger.debug("New packet received.")
                 await self.handle_new_packet(new_packet, True)
 
-    async def handle_new_packet(self, new_packet, match_session_key=False):
+    async def handle_new_packet(
+        self, new_packet: open_data_pb2.Packet, match_session_key: bool = False
+    ):
+        """Decodes new protobuf packets received from the Stream API.
 
-        packet_type = new_packet.response[0].packet.type
-        content = new_packet.response[0].packet.content
-        session_key = new_packet.response[0].packet.session_key
+        Args:
+            new_packet: Protobuf packet from the open format specification
+            match_session_key: True if we only handle packet that match `self.session_key`
+        """
+
+        packet_type = new_packet.type
+        content = new_packet.content
+        session_key = new_packet.session_key
 
         # discard the packet if the session key does not match
         if match_session_key and (session_key != self.session_key):

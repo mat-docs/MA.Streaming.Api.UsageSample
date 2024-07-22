@@ -91,7 +91,8 @@ class AtlasSessionWriter:
         Args:
             packet: Configuration Packet received from the Stream API.
 
-        Returns: None, config is created and committed to the session.
+        Returns:
+            None, config is created and committed to the session.
         """
         logger.debug("Creating new config.")
         config_identifier = (
@@ -203,7 +204,7 @@ class AtlasSessionWriter:
             timestamps: List of timestamp in SQLRace format
 
         Returns:
-            bool if the config is found and data added.
+            True if the config is found and data added.
         """
         try:
             channel_id = self.parameter_channel_id_mapping[parameter_identifier]

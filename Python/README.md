@@ -22,5 +22,14 @@ gen_proto.bat
 
 ## Stream Writer Basic
 
-This is an example demonstrating how to publish data via the stream API. 
-Two periodic parameters are created as part of this example, `Sin:MyApp` and `Cos:MyApp` which are sin and cos waves.  
+This example demonstrates how to publish new data via the Stream API.
+
+Two parameters are present as part of this sample, `Sin:MyApp`, and `Cos:MyApp`,corresponding
+to a sine and cosine wave.
+
+## Stream Reader SQLRace
+
+This example demonstrates how to consume data from the broker via the Stream API.
+The example will read packets for an ongoing session, and write the contents to an
+ATLAS Session.
+If there are no ongoing session, it will wait until a new one starts.
