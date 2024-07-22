@@ -52,7 +52,7 @@ class SinWaveGenerator:
         """Interval between samples in ns."""
         return int(1e9 / self.frequency)
 
-    def get_new_packet(self, data_format_id):
+    def get_new_packet(self, data_format_id: int):
         """Generate the PeriodicDataPacket for the next segment of the sine wave."""
         t = self.time_ns
 
@@ -72,7 +72,7 @@ class SinWaveGenerator:
         )
         return data_packet
 
-    def build_configuration_packet(self, config_id):
+    def build_configuration_packet(self, config_id: str):
         parameter_definitions = []
         for param_id in self.param_identifiers:
             param_def = self.build_parameter_definition_packet(*param_id.split(":"))
@@ -83,7 +83,7 @@ class SinWaveGenerator:
         )
         return config_packet
 
-    def build_parameter_definition_packet(self, name, app):
+    def build_parameter_definition_packet(self, name: str, app: str):
         param_def = open_data_pb2.ParameterDefinition(
             identifier=f"{name}:{app}",
             name=name,

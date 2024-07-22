@@ -106,7 +106,7 @@ def main():
                 )
             )
         )
-        logger.info("Configuration packet published.")
+        logger.info("Configuration packet published. Id: %s", config_id)
 
         # Generate the data format id, which corresponds to the list of parameter
         # identifiers.

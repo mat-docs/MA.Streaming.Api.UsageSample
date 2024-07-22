@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class StreamReaderSql:
     """Read data from the Stream API and write it to an ATLAS Session"""
 
-    def __init__(self, atlas_ssndb_location):
+    def __init__(self, atlas_ssndb_location: str):
         self.session_writer: AtlasSessionWriter
         self.data_source = "SampleDataSource"
         self.grpc_address = "localhost:13579"
@@ -129,7 +129,7 @@ class StreamReaderSql:
         # Create a corresponding config in atlas
         self.session_writer.add_configration(packet)
 
-    async def handle_periodic_packet(self, packet):
+    async def handle_periodic_packet(self, packet: open_data_pb2.PeriodicDataPacket):
         ##  Get the parameter identifier
         if packet.data_format.data_format_identifier != 0:
             data_format_manager_stub = self.stream_api.data_format_manager_service_stub
@@ -164,9 +164,10 @@ class StreamReaderSql:
         timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
         # add the data to the session
         for parameter_identifier, data_for_param in zip(parameter_identifiers, data):
-            self.session_writer.add_data(
+            if not self.session_writer.add_data(
                 parameter_identifier, data_for_param, timestamps_sqlrace
-            )
+            ):
+                logger.warning("Failed to add data.")
 
     async def main(self):
         # Create the gRPC clients

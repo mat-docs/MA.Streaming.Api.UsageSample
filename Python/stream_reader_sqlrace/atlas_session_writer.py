@@ -2,6 +2,7 @@ import os
 import logging
 import struct
 import datetime
+from typing import List
 
 from ma.streaming.open_data.v1 import open_data_pb2
 from stream_reader_sqlrace.SqlRace import SQLiteConnection
@@ -62,13 +63,13 @@ from MESL.SqlRace.Enumerators import (  # .NET imports, so pylint: disable=wrong
 
 class AtlasSessionWriter:
 
-    def __init__(self, db_location=r"C:\McLaren Applied\StreamAPIDemo.ssndb"):
+    def __init__(self, db_location: str = r"C:\McLaren Applied\StreamAPIDemo.ssndb"):
         self.sql_race_connection = None
         self.session = None
         self.parameter_channel_id_mapping = dict()
         self.create_sqlrace_session(db_location)
 
-    def create_sqlrace_session(self, db_location):
+    def create_sqlrace_session(self, db_location: str):
         sql_race_connection = SQLiteConnection(
             db_location,
             session_identifier=f"Stream API DEMO {datetime.datetime.now()}",
@@ -202,7 +203,9 @@ class AtlasSessionWriter:
             )
         self.session.UseLoggingConfigurationSet(config.Identifier)
 
-    def add_data(self, parameter_identifier, data, timestamps) -> bool:
+    def add_data(
+        self, parameter_identifier: str, data: List[float], timestamps: List[float]
+    ) -> bool:
         """Add data to a parameter.
 
         Data are in floats, and timestamp as in seconds from midnight (SQLRace format)
