@@ -1,8 +1,8 @@
 """Code to build Packets according to the Open Data specification."""
 
 import time
-import numpy as np
 from typing import List
+import numpy as np
 
 from ma.streaming.open_data.v1 import open_data_pb2
 

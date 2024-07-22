@@ -31,7 +31,7 @@ if not os.path.isfile(SQL_RACE_DLL_PATH):
         + " please check that Atlas 10 is installed"
     )
 
-clr.AddReference(SQL_RACE_DLL_PATH)
+clr.AddReference(SQL_RACE_DLL_PATH)  # pylint: disable=no-member
 
 # .NET imports, so pylint: disable=wrong-import-position,wrong-import-order,import-error,wildcard-import
 from MAT.OCS.Core import (

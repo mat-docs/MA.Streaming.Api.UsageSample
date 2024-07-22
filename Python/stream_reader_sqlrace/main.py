@@ -28,6 +28,7 @@ class StreamReaderSql:
     """Read data from the Stream API and write it to an ATLAS Session"""
 
     def __init__(self, atlas_ssndb_location: str):
+        self.connection = None
         self.session_writer: AtlasSessionWriter
         self.data_source = "SampleDataSource"
         self.grpc_address = "localhost:13579"

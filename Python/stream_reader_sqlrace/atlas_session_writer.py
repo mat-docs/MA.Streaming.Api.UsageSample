@@ -5,7 +5,7 @@ import datetime
 from typing import List
 
 from ma.streaming.open_data.v1 import open_data_pb2
-from stream_reader_sqlrace.SqlRace import SQLiteConnection
+from stream_reader_sqlrace.sql_race import SQLiteConnection
 
 logger = logging.getLogger(__name__)
 # configure pythonnet runtime for SQLRace API
@@ -66,7 +66,7 @@ class AtlasSessionWriter:
     def __init__(self, db_location: str = r"C:\McLaren Applied\StreamAPIDemo.ssndb"):
         self.sql_race_connection = None
         self.session = None
-        self.parameter_channel_id_mapping = dict()
+        self.parameter_channel_id_mapping = {}
         self.create_sqlrace_session(db_location)
 
     def create_sqlrace_session(self, db_location: str):
@@ -109,7 +109,8 @@ class AtlasSessionWriter:
             config_identifier,
         ):
             logger.info(
-                "Logging config already exist, skip reprocessing logging config. Config identifier: %s",
+                "Logging config already exist, skip reprocessing logging config. "
+                "Config identifier: %s",
                 config_identifier,
             )
             self.session.UseLoggingConfigurationSet(config_identifier)
