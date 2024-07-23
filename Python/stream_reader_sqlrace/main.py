@@ -106,14 +106,14 @@ class StreamReaderSql:
             logger.info("Session key mismatch, packet discarded.")
             return
 
-        # try and deserializes the packet, if the pack type can be located.
+        # try and deserializes the packet, if the packet type can be located.
         # if we can't find a corresponding packet type, discard the packet.
         try:
             packet_class = getattr(open_data_pb2, packet_type + "Packet")
             packet = packet_class.FromString(content)
         except AttributeError:
             logger.debug(
-                "Unable to deserializes pack content for pack type %s", packet_type
+                "Unable to deserializes packet content for pack type %s", packet_type
             )
             return
 
