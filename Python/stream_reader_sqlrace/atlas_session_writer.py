@@ -8,17 +8,16 @@ from ma.streaming.open_data.v1 import open_data_pb2
 from stream_reader_sqlrace.sql_race import SQLiteConnection
 
 logger = logging.getLogger(__name__)
+A10_INSTALL_PATH = r"C:\Program Files\McLaren Applied Technologies\ATLAS 10"
+SQL_RACE_DLL_PATH = rf"{A10_INSTALL_PATH}\MESL.SqlRace.Domain.dll"
+SQL_RACE_RUNTIME_CONFIG = rf"{A10_INSTALL_PATH}\MAT.Atlas.Host.runtimeconfig.json"
+
 # configure pythonnet runtime for SQLRace API
 os.environ["PYTHONNET_RUNTIME"] = "coreclr"
-os.environ["PYTHONNET_CORECLR_RUNTIME_CONFIG"] = (
-    r"C:\Program Files\McLaren Applied Technologies\ATLAS 10\MAT.Atlas.Host.runtimeconfig.json"
-)
+os.environ["PYTHONNET_CORECLR_RUNTIME_CONFIG"] = SQL_RACE_RUNTIME_CONFIG
 
 # only import clr after the runtime has been configured, so pylint: disable=wrong-import-position
 import clr
-
-A10_INSTALL_PATH = r"C:\Program Files\McLaren Applied Technologies\ATLAS 10"
-SQL_RACE_DLL_PATH = rf"{A10_INSTALL_PATH}\MESL.SqlRace.Domain.dll"
 
 # Configure Pythonnet and reference the required assemblies for dotnet and SQL Race
 clr.AddReference("System.Collections")  # pylint: disable=no-member
