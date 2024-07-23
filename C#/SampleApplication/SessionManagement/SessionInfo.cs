@@ -19,7 +19,27 @@ public class SessionInfo
 
     public bool IsComplete { get; }
 
-    public SessionInfo(string dataSource, string sessionKey, string type, uint version, IReadOnlyList<string> associatedKeys, string identifier, bool isComplete)
+    public long MainOffset { get; }
+
+    public long EssentialOffset { get; }
+
+    public IReadOnlyList<string> Streams { get; }
+
+    public IDictionary<string, long> TopicPartitionsOffset { get; }
+
+    public SessionInfo(
+        string dataSource,
+        string sessionKey,
+        string type,
+        uint version,
+        IReadOnlyList<string> associatedKeys,
+        string identifier,
+        bool isComplete,
+        long mainOffset,
+        long essentialOffset,
+        IReadOnlyList<string> streams,
+        IDictionary<string, long> topicPartitionsOffset)
+
     {
         this.DataSource = dataSource;
         this.SessionKey = sessionKey;
@@ -28,5 +48,9 @@ public class SessionInfo
         this.AssociatedKeys = associatedKeys;
         this.Identifier = identifier;
         this.IsComplete = isComplete;
+        this.MainOffset = mainOffset;
+        this.EssentialOffset = essentialOffset;
+        this.Streams = streams;
+        this.TopicPartitionsOffset = topicPartitionsOffset;
     }
 }
