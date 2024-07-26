@@ -49,6 +49,7 @@ from MESL.SqlRace.Domain import (  # .NET imports, so pylint: disable=wrong-impo
     ParameterGroup,
     ApplicationGroup,
     RationalConversion,
+    TextConversion,
     ConfigurationSetAlreadyExistsException,
     Parameter,
     Channel,
@@ -151,6 +152,7 @@ class AtlasSessionWriter:
 
         # Add a row channel per parameter
         for parameter_definition in packet.parameter_definitions:
+            conversion = "DefaultConversions"
             # Add a row channel
             channel_id = self.session.ReserveNextAvailableRowChannelId() % 2147483647
             self.parameter_channel_id_mapping[parameter_definition.identifier] = (
@@ -165,6 +167,19 @@ class AtlasSessionWriter:
                 ChannelDataSourceType.RowData,
             )
             config.AddChannel(myParameterChannel)
+
+            if parameter_definition.conversion.conversion_identifier != "":
+                config.AddConversion(
+                    TextConversion(
+                        parameter_definition.conversion.conversion_identifier,
+                        parameter_definition.units,
+                        parameter_definition.format_string,
+                        parameter_definition.conversion.input_values,
+                        parameter_definition.conversion.string_values,
+                        parameter_definition.conversion.default
+                    )
+                )
+                conversion = parameter_definition.conversion.conversion_identifier
 
             # Add Parameter
             # .NET objects, so pylint: disable=invalid-name
@@ -187,7 +202,7 @@ class AtlasSessionWriter:
                 0.0,
                 0xFFFF,
                 0,
-                "DefaultConversion",
+                conversion,
                 parameterGroupIdentifiers,
                 myParamChannelId,
                 parameter_definition.application_name,
