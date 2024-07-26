@@ -53,6 +53,8 @@ from MESL.SqlRace.Domain import (  # .NET imports, so pylint: disable=wrong-impo
     Parameter,
     Channel,
     DatabaseConnectionInformation,
+    SessionDataItem,
+    Marker,
 )
 from MESL.SqlRace.Enumerators import (  # .NET imports, so pylint: disable=wrong-import-position,wrong-import-order,import-error
     DataType,
@@ -283,3 +285,13 @@ class AtlasSessionWriter:
         # Close the session if one was created
         if self.sql_race_connection is not None:
             self.sql_race_connection.close_session()
+
+    def add_details(self, key, value):
+        """Add session details to the session."""
+        session_item = SessionDataItem(key, value)
+        self.session.Items.Add(session_item)
+
+    def add_marker(self, timestamp: int, label: str):
+        new_point_marker = Marker(int(timestamp), label)
+        new_markers = Array[Marker]([new_point_marker])
+        self.session.Markers.Add(new_markers)
