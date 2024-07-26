@@ -64,6 +64,7 @@ class StreamReaderSql:
             ):
                 print(stop_notification.session_key)
                 self.terminate_main_task()
+                self.session_writer.close_session()
 
     def terminate_main_task(self, *_):
         logger.info("Terminating main task.")
@@ -283,68 +284,71 @@ class StreamReaderSql:
         connection_management_stub = self.stream_api.connection_manager_service_stub
         session_management_stub = self.stream_api.session_management_service_stub
 
-        # Get the latest live session
-        current_session_response = session_management_stub.GetCurrentSessions(
-            api_pb2.GetCurrentSessionsRequest(data_source=self.data_source)
-        )
-
-        for test_key in current_session_response.session_keys[::-1]:
-            session_info_response = session_management_stub.GetSessionInfo(
-                api_pb2.GetSessionInfoRequest(session_key=test_key)
-            )
-            if not session_info_response.is_complete:
-                self.session_key = test_key
-                logger.info("Identified live session %s", self.session_key)
-                break
-
-        # if there is no live session wait for a new one to start
-        if self.session_key is None:
-            logger.info("No live session found, waiting for new session to start.")
-            for new_session in session_management_stub.GetSessionStartNotification(
-                api_pb2.GetSessionStartNotificationRequest(data_source=self.data_source)
-            ):
-                self.session_key = new_session.session_key
-                logger.info("Identified live session %s", self.session_key)
-                break
-
-        session_info_response = session_management_stub.GetSessionInfo(
-            api_pb2.GetSessionInfoRequest(session_key=self.session_key)
-        )
-
-        # Establish a new connection
-        connection_details = api_pb2.ConnectionDetails(
-            data_source=self.data_source,
-            session=self.session_key,
-            main_offset=session_info_response.main_offset,
-            essentials_offset=session_info_response.essentials_offset,
-        )
-
-        connection_response = connection_management_stub.NewConnection(
-            api_pb2.NewConnectionRequest(details=connection_details)
-        )
-
-        self.connection = connection_response.connection
-
-        # Create a corresponding ATLAS session
-        self.session_writer = AtlasSessionWriter(self.atlas_ssndb_location)
-
-        # Read essential stream which contains essential information such as configs
-        await self.read_essentials()
-
-        # Set up a handler if we want to terminate early by ctrl+c
-        signal.signal(signal.SIGINT, self.terminate_main_task)
-
-        # Read packets and monitor session stop at the same time
-        self.main_task = asyncio.gather(
-            self.session_stop(),
-            self.read_packets(),
-        )
         try:
-            logger.debug("Starting main task.")
-            await self.main_task
-        except asyncio.CancelledError:
-            logger.info("Terminating...")
+            # Set up a handler if we want to terminate early by ctrl+c
+            signal.signal(signal.SIGINT, self.terminate_main_task)
+            while True:
+                self.session_key = None
+                # Get the latest live session
+                current_session_response = session_management_stub.GetCurrentSessions(
+                    api_pb2.GetCurrentSessionsRequest(data_source=self.data_source)
+                )
 
+                for test_key in current_session_response.session_keys[::-1]:
+                    session_info_response = session_management_stub.GetSessionInfo(
+                        api_pb2.GetSessionInfoRequest(session_key=test_key)
+                    )
+                    if not session_info_response.is_complete:
+                        self.session_key = test_key
+                        logger.info("Identified live session %s", self.session_key)
+                        break
+
+                # if there is no live session wait for a new one to start
+                if self.session_key is None:
+                    logger.info("No live session found, waiting for new session to start.")
+                    for new_session in session_management_stub.GetSessionStartNotification(
+                        api_pb2.GetSessionStartNotificationRequest(data_source=self.data_source)
+                    ):
+                        self.session_key = new_session.session_key
+                        logger.info("Identified live session %s", self.session_key)
+                        break
+
+                session_info_response = session_management_stub.GetSessionInfo(
+                    api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+                )
+
+                # Establish a new connection
+                connection_details = api_pb2.ConnectionDetails(
+                    data_source=self.data_source,
+                    session=self.session_key,
+                    main_offset=session_info_response.main_offset,
+                    essentials_offset=session_info_response.essentials_offset,
+                )
+
+                connection_response = connection_management_stub.NewConnection(
+                    api_pb2.NewConnectionRequest(details=connection_details)
+                )
+
+                self.connection = connection_response.connection
+
+                # Create a corresponding ATLAS session
+                self.session_writer = AtlasSessionWriter(self.atlas_ssndb_location)
+
+                # Read essential stream which contains essential information such as configs
+                await self.read_essentials()
+
+                # Read packets and monitor session stop at the same time
+                self.main_task = asyncio.gather(
+                    self.session_stop(),
+                    self.read_packets(),
+                )
+                try:
+                    logger.debug("Starting main task.")
+                    await self.main_task
+                except asyncio.CancelledError:
+                    logger.info("Terminating...")
+        except KeyboardInterrupt:
+            logger.info("Terminating...")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
