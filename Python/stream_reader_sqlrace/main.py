@@ -15,6 +15,8 @@ import signal
 
 import grpc
 import numpy as np
+import pandas as pd
+from google.protobuf import wrappers_pb2
 
 from ma.streaming.api.v1 import api_pb2_grpc, api_pb2
 from ma.streaming.open_data.v1 import open_data_pb2
@@ -118,8 +120,17 @@ class StreamReaderSql:
             return
 
         if isinstance(packet, open_data_pb2.PeriodicDataPacket):
-            logger.debug("Data packet received.")
+            logger.debug("Periodic packet received.")
             await self.handle_periodic_packet(packet)
+        elif isinstance(packet, open_data_pb2.RowDataPacket):
+            logger.debug("Row packet received.")
+            await self.handle_row_packet(packet)
+        elif isinstance(packet, open_data_pb2.MarkerPacket):
+            logger.debug("Marker packet received.")
+            await self.handle_marker_packet(packet)
+        elif isinstance(packet, open_data_pb2.MetadataPacket):
+            logger.debug("Metadata packet received.")
+            await self.handle_metatdata_packet(packet)
         elif isinstance(packet, open_data_pb2.ConfigurationPacket):
             logger.debug("Config packet received.")
             await self.handle_configuration_packet(packet)
@@ -169,6 +180,85 @@ class StreamReaderSql:
                 parameter_identifier, data_for_param, timestamps_sqlrace
             ):
                 logger.warning("Failed to add data.")
+
+    async def handle_row_packet(self, packet: open_data_pb2.RowDataPacket):
+        ##  Get the parameter identifier
+        if packet.data_format.data_format_identifier != 0:
+            data_format_manager_stub = self.stream_api.data_format_manager_service_stub
+            param_list_response = data_format_manager_stub.GetParametersList(
+                api_pb2.GetParametersListRequest(
+                    data_source=self.data_source,
+                    data_format_identifier=packet.data_format.data_format_identifier,
+                )
+            )
+            parameter_identifiers = list(param_list_response.parameters)
+        else:
+            parameter_identifiers = (
+                packet.data_format.parameter_identifiers.parameter_identifiers
+            )
+
+        samples = getattr(packet.rows[0], packet.rows[0].WhichOneof("list")).samples
+        assert len(parameter_identifiers) == len(
+            samples
+        ), "The number of parameter identifiers should match the number of columns"
+
+        assert len(packet.timestamps) == len(packet.rows), (
+            "The number of timestamps" "should match the number of rows."
+        )
+
+        df = pd.DataFrame(
+            columns=parameter_identifiers, index=pd.Index([]), dtype=float
+        )
+
+        ## Get the row data
+        for timestamps_ns, row in zip(packet.timestamps, packet.rows):
+            # Create timestamps and convert them to SQLRace format.
+            timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+            samples = getattr(row, row.WhichOneof("list")).samples
+            data = [
+                (
+                    s.value
+                    if s.status == open_data_pb2.DataStatus.DATA_STATUS_VALID
+                    else pd.NA
+                )
+                for s in samples
+            ]
+            df.loc[timestamps_sqlrace, :] = data
+
+        ## Add the data to the session
+        # add the data to the session
+        for name, column in df.items():
+            column.dropna(inplace=True)
+            if column.size == 0:
+                continue
+            if not self.session_writer.add_data(
+                name, column.values.tolist(), column.index.tolist()
+            ):
+                logger.warning("Failed to add data.")
+
+    async def handle_marker_packet(self, packet: open_data_pb2.MarkerPacket):
+        if packet.type == "Lap Trigger":
+            timestamps_ns = packet.timestamp
+            timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+            self.session_writer.add_lap(timestamps_sqlrace, packet.value, packet.label)
+        else:
+            timestamps_ns = packet.timestamp
+            timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+            self.session_writer.add_marker(timestamps_sqlrace,packet.label)
+
+    async def handle_metatdata_packet(self, packet: open_data_pb2.MetadataPacket):
+        for key, any_value in packet.metadata.items():
+            # Check if the value is of type StringValue
+            if any_value.Is(wrappers_pb2.StringValue.DESCRIPTOR):
+                value = wrappers_pb2.StringValue()
+                any_value.Unpack(value)
+                self.session_writer.add_details(key, value.value)
+            elif any_value.Is(wrappers_pb2.DoubleValue.DESCRIPTOR):
+                value = wrappers_pb2.DoubleValue()
+                any_value.Unpack(value)
+                self.session_writer.add_details(key, value.value)
+            else:
+                print(f"Unsupported value type for metadata: {key}")
 
     async def main(self):
         # Create the gRPC clients
