@@ -244,7 +244,7 @@ class StreamReaderSql:
         else:
             timestamps_ns = packet.timestamp
             timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
-            self.session_writer.add_marker(timestamps_sqlrace,packet.label)
+            self.session_writer.add_marker(timestamps_sqlrace, packet.label)
 
     async def handle_metatdata_packet(self, packet: open_data_pb2.MetadataPacket):
         for key, any_value in packet.metadata.items():
@@ -271,12 +271,12 @@ class StreamReaderSql:
             )
             event_identifier = event_identifier_response.event
         else:
-            event_identifier = (
-                packet.data_format.event_identifier
-            )
+            event_identifier = packet.data_format.event_identifier
         timestamps_ns = packet.timestamp
         timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
-        self.session_writer.add_event_data(event_identifier,timestamps_sqlrace,packet.raw_values)
+        self.session_writer.add_event_data(
+            event_identifier, timestamps_sqlrace, packet.raw_values
+        )
 
     async def main(self):
         # Create the gRPC clients

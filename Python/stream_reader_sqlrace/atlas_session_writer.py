@@ -172,6 +172,8 @@ class AtlasSessionWriter:
             )
             config.AddChannel(myParameterChannel)
 
+            # If text conversion definition exist, then create the text conversion and
+            # update the conversion identifier from the default
             if parameter_definition.conversion.conversion_identifier != "":
                 config.AddConversion(
                     TextConversion(
@@ -180,7 +182,7 @@ class AtlasSessionWriter:
                         parameter_definition.format_string,
                         parameter_definition.conversion.input_values,
                         parameter_definition.conversion.string_values,
-                        parameter_definition.conversion.default
+                        parameter_definition.conversion.default,
                     )
                 )
                 conversion = parameter_definition.conversion.conversion_identifier
@@ -248,6 +250,7 @@ class AtlasSessionWriter:
                     conversion_function_names[i] = (
                         text_conversion_definition.conversion_identifier
                     )
+            # .NET objects, so pylint: disable=invalid-name
             conversionFunctionNames = Array[String](conversion_function_names)
 
             # .NET objects, so pylint: disable=invalid-name
@@ -352,23 +355,19 @@ class AtlasSessionWriter:
             self.sql_race_connection.close_session()
 
     def add_details(self, key, value):
-        """Add session details to the session."""
+        """Add a session detail to the session."""
         session_item = SessionDataItem(key, value)
         self.session.Items.Add(session_item)
 
     def add_marker(self, timestamp: int, label: str):
+        """Add a point marker to the session."""
         new_point_marker = Marker(int(timestamp), label)
         new_markers = Array[Marker]([new_point_marker])
         self.session.Markers.Add(new_markers)
 
-    def add_event_data(
-        self, event_definition_key, event_time, raw_data
-    ):
+    def add_event_data(self, event_definition_key, event_time, raw_data):
         """Add an event instance data to the session."""
         raw_data = Array[Double](raw_data)
         self.session.Events.AddEventData(
-            event_definition_key,
-            "",  # default to no group name
-            event_time,
-            raw_data
+            event_definition_key, "", event_time, raw_data  # default to no group name
         )
