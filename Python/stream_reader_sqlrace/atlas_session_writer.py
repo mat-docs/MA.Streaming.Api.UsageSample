@@ -42,6 +42,7 @@ from System import (  # .NET imports, so pylint: disable=wrong-import-position,w
     UInt32,
     Array,
     Int64,
+    Double,
 )
 from MESL.SqlRace.Domain import (  # .NET imports, so pylint: disable=wrong-import-position,wrong-import-order,import-error
     Lap,
@@ -56,10 +57,12 @@ from MESL.SqlRace.Domain import (  # .NET imports, so pylint: disable=wrong-impo
     DatabaseConnectionInformation,
     SessionDataItem,
     Marker,
+    EventDefinition,
 )
 from MESL.SqlRace.Enumerators import (  # .NET imports, so pylint: disable=wrong-import-position,wrong-import-order,import-error
     DataType,
     ChannelDataSourceType,
+    EventPriorityType,
 )
 
 
@@ -88,7 +91,7 @@ class AtlasSessionWriter:
         large amount of information. For all parameters regardless of the data type
         specified, it will create a row channel of doubles.
 
-        This function also ignores all the groups and events.
+        This function also ignores all the groups.
 
         For examples to use the SQLRace API fully, see the SQLRace API code samples.
 
@@ -123,9 +126,10 @@ class AtlasSessionWriter:
         )
 
         # Create 1to1 conversion
+        one_to_one_conversion_name = "DefaultConversion"
         config.AddConversion(
             RationalConversion.CreateSimple1To1Conversion(
-                "DefaultConversion", "kph", "%5.2f"
+                one_to_one_conversion_name, "", "%5.2f"
             )
         )
 
@@ -152,7 +156,7 @@ class AtlasSessionWriter:
 
         # Add a row channel per parameter
         for parameter_definition in packet.parameter_definitions:
-            conversion = "DefaultConversions"
+            conversion = one_to_one_conversion_name
             # Add a row channel
             channel_id = self.session.ReserveNextAvailableRowChannelId() % 2147483647
             self.parameter_channel_id_mapping[parameter_definition.identifier] = (
@@ -210,6 +214,52 @@ class AtlasSessionWriter:
                 parameter_definition.units,
             )
             config.AddParameter(myParameter)
+
+        for event_definition in packet.event_definitions:
+            event_def_priority_map = {
+                open_data_pb2.EVENT_PRIORITY_DEBUG: EventPriorityType.Debug,
+                open_data_pb2.EVENT_PRIORITY_LOW: EventPriorityType.Low,
+                open_data_pb2.EVENT_PRIORITY_MEDIUM: EventPriorityType.Medium,
+                open_data_pb2.EVENT_PRIORITY_HIGH: EventPriorityType.High,
+                # no critical level in SQLRace, map it to high
+                open_data_pb2.EVENT_PRIORITY_CRITICAL: EventPriorityType.High,
+                # no unspecified level in SQLRace, map it to low
+                open_data_pb2.EVENT_PRIORITY_UNSPECIFIED: EventPriorityType.Low,
+            }
+
+            # Process the text configuration, if any.
+            # If there are no text configuration found then the one to one configuration
+            # will be applied.
+            conversion_function_names = [one_to_one_conversion_name] * 3
+            for i, text_conversion_definition in enumerate(
+                event_definition.conversions
+            ):
+                if text_conversion_definition.conversion_identifier != "":
+                    config.AddConversion(
+                        TextConversion(
+                            text_conversion_definition.conversion_identifier,
+                            "",
+                            "5.2f",
+                            text_conversion_definition.input_values,
+                            text_conversion_definition.string_values,
+                            text_conversion_definition.default,
+                        )
+                    )
+                    conversion_function_names[i] = (
+                        text_conversion_definition.conversion_identifier
+                    )
+            conversionFunctionNames = Array[String](conversion_function_names)
+
+            # .NET objects, so pylint: disable=invalid-name
+            eventDefinition = EventDefinition(
+                event_definition.definition_id,
+                event_definition.description,
+                event_def_priority_map[event_definition.priority],
+                conversionFunctionNames,
+                event_definition.application_name,
+            )
+
+            config.AddEventDefinition(eventDefinition)
 
         try:
             config.Commit()
@@ -310,3 +360,15 @@ class AtlasSessionWriter:
         new_point_marker = Marker(int(timestamp), label)
         new_markers = Array[Marker]([new_point_marker])
         self.session.Markers.Add(new_markers)
+
+    def add_event_data(
+        self, event_definition_key, event_time, raw_data
+    ):
+        """Add an event instance data to the session."""
+        raw_data = Array[Double](raw_data)
+        self.session.Events.AddEventData(
+            event_definition_key,
+            "",  # default to no group name
+            event_time,
+            raw_data
+        )
