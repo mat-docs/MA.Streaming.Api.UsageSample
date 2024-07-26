@@ -280,6 +280,7 @@ class StreamReaderSql:
         )
 
     async def main(self):
+        # This stream reader will continuously wait for a live session until it is stopped.
         # Create the gRPC clients
         connection_management_stub = self.stream_api.connection_manager_service_stub
         session_management_stub = self.stream_api.session_management_service_stub
