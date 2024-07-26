@@ -312,9 +312,7 @@ class AtlasSessionWriter:
 
         self.session.AddRowData(channel_id, timestamps_array, databytes, 8, False)
 
-        # if there isn't a lap then at one at the start
-        if self.session.LapCollection.Count == 0:
-            self.add_lap(min(timestamps))
+        # Make sure to add a lap at the beginning. It should come from the writer.
 
         return True
 
