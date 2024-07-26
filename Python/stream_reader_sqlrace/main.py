@@ -260,6 +260,24 @@ class StreamReaderSql:
             else:
                 print(f"Unsupported value type for metadata: {key}")
 
+    async def handle_event_packet(self, packet: open_data_pb2.EventPacket):
+        if packet.data_format.data_format_identifier != 0:
+            data_format_manager_stub = self.stream_api.data_format_manager_service_stub
+            event_identifier_response = data_format_manager_stub.GetEvent(
+                api_pb2.GetEventRequest(
+                    data_source=self.data_source,
+                    data_format_identifier=packet.data_format.data_format_identifier,
+                )
+            )
+            event_identifier = event_identifier_response.event
+        else:
+            event_identifier = (
+                packet.data_format.event_identifier
+            )
+        timestamps_ns = packet.timestamp
+        timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+        self.session_writer.add_event_data(event_identifier,timestamps_sqlrace,packet.raw_values)
+
     async def main(self):
         # Create the gRPC clients
         connection_management_stub = self.stream_api.connection_manager_service_stub
