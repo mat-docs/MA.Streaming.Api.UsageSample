@@ -16,6 +16,7 @@ namespace Stream.Api.Stream.Reader
         private string markersCsv;
         private string rootFolderPath;
         public string sessionName;
+        private DateTime lastUpdated;
         private readonly string streamApiSessionKey;
         private readonly string dataSource;
         private List<EventText> eventsRecords = new List<EventText>();
@@ -33,6 +34,7 @@ namespace Stream.Api.Stream.Reader
             this.sessionName = sessionName;
             this.streamApiSessionKey = streamApiSessionKey;
             this.dataSource = dataSource;
+            this.lastUpdated = DateTime.Now;
         }
 
         /// <summary>
@@ -53,6 +55,7 @@ namespace Stream.Api.Stream.Reader
                     {
                         while (await packetStream.ResponseStream.MoveNext(cancellationToken))
                         {
+                            lastUpdated = DateTime.Now;
                             var packetResponse = packetStream.ResponseStream.Current;
                             foreach (var response in packetResponse.Response) HandleNewPacket(response.Packet);
                         }
@@ -300,7 +303,7 @@ namespace Stream.Api.Stream.Reader
         /// <param name="packet"></param>
         private void HandleMetadataPacket(MetadataPacket packet)
         {
-            Console.WriteLine("Metadata packets are unsuppored.");
+            Console.WriteLine("Metadata packets are unsupported.");
         }
 
         /// <summary>
@@ -332,6 +335,10 @@ namespace Stream.Api.Stream.Reader
         /// </summary>
         public void EndSession()
         {
+            // Wait for streams to finish.
+            do
+            {
+            } while (DateTime.Now - lastUpdated < TimeSpan.FromSeconds(10));
             var records = parametersPeriodicRecords;
             records.AddRange(parametersRowRecords);
             this.parameterCsv = this.rootFolderPath + $"{sessionName}_parameters.csv";

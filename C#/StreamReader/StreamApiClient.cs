@@ -6,13 +6,15 @@ namespace Stream.Api.Stream.Reader
     internal class StreamApiClient
     {
         // This is the Stream API client that manages the sessions based off the calls given by the Stream API server.
-        private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+        private readonly CancellationTokenSource cancellationTokenSourceSession = new CancellationTokenSource();
+        private readonly CancellationTokenSource cancellationTokenSourceEvents = new CancellationTokenSource();
         private ConnectionManagerService.ConnectionManagerServiceClient? connectionManagerServiceClient;
         private SessionManagementService.SessionManagementServiceClient? sessionManagementServiceClient;
         private readonly Dictionary<string, TextSession> streamSessionKeyToTextSessions =
             new Dictionary<string, TextSession>();
         private string rootFolderPath;
         private Dictionary<string, DateTime> streams = new Dictionary<string, DateTime>();
+        private string previousSessionKey;
 
         public StreamApiClient(string rootFolderPath)
         {
@@ -67,7 +69,7 @@ namespace Stream.Api.Stream.Reader
             var startNotificationStream = sessionManagementServiceClient.GetSessionStartNotification(
                 new GetSessionStartNotificationRequest() { DataSource = dataSource }
             ).ResponseStream;
-            var cancellationToken = cancellationTokenSource.Token;
+            var cancellationToken = cancellationTokenSourceEvents.Token;
             Console.WriteLine("Waiting for live session.");
             var task = await Task.Run(async () =>
             {
@@ -100,7 +102,7 @@ namespace Stream.Api.Stream.Reader
                 sessionManagementServiceClient.GetSessionStopNotification(new GetSessionStopNotificationRequest()
                     { DataSource = dataSource }).ResponseStream;
 
-            var cancellationToken = cancellationTokenSource.Token;
+            var cancellationToken = cancellationTokenSourceEvents.Token;
             Task.Run(async () =>
             {
                 try
@@ -109,8 +111,8 @@ namespace Stream.Api.Stream.Reader
                     while (await stopNotificationStream.MoveNext(cancellationToken))
                     {
                         var stopNotificationResponse = stopNotificationStream.Current;
-                        Task.Delay(120000);
                         streamSessionKeyToTextSessions[stopNotificationResponse.SessionKey].EndSession();
+                        Console.WriteLine($"Session Ended {stopNotificationResponse.SessionKey}.");
                         return;
                     }
                 }
@@ -149,8 +151,9 @@ namespace Stream.Api.Stream.Reader
             var sessionResponse = sessionManagementServiceClient.GetSessionInfo(request);
             var newStreams = sessionResponse.Streams.Where(i => !streams.Keys.Contains(i)).ToList();
             streamSessionKeyToTextSessions[sessionKey].sessionName = sessionResponse.Identifier;
-            if (newStreams.Any())
+            if (newStreams.Any() || previousSessionKey != sessionKey)
             {
+                previousSessionKey = sessionKey;
                 _ = Task.Run(() =>
                 {
 
@@ -172,22 +175,20 @@ namespace Stream.Api.Stream.Reader
                         DataSource = sessionResponse.DataSource,
                         Streams = { offsets.Select(i => i.Item1) },
                         StreamOffsets = { offsets.Select(i => i.Item2) },
-                        MainOffset = sessionResponse.MainOffset,
-                        EssentialsOffset = sessionResponse.EssentialsOffset,
                         Session = sessionKey
                     };
                     var connectionResponse = connectionManagerServiceClient.NewConnection(new NewConnectionRequest()
                         { Details = connectionDetails });
-                    var cancellationToken = cancellationTokenSource.Token;
+                    var cancellationToken = cancellationTokenSourceSession.Token;
                     streamSessionKeyToTextSessions[sessionKey].ReadPackets(cancellationToken, connectionResponse.Connection);
                 });
             }
             return sessionResponse.IsComplete;
         }
 
-        public async void QuerySessionInfo(string sessionKey)
+        public void QuerySessionInfo(string sessionKey)
         {
-            var cancellationToken = cancellationTokenSource.Token;
+            var cancellationToken = cancellationTokenSourceSession.Token;
             bool finished;
             do
             {
