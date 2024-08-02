@@ -364,3 +364,6 @@ FodyWeavers.xsd
 
 # gRPC Compiled Python Files
 Python/ma
+/Python/.idea
+/Python/proto
+/Python/streaming

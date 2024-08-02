@@ -1,0 +1,12 @@
+﻿namespace Stream.Api.Stream.Reader
+{
+    public class LapText
+    {
+        public ulong Timestamp { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public string Description { get; set; }
+        public string Source { get; set; }
+        public long Value { get; set; }
+    }
+}
