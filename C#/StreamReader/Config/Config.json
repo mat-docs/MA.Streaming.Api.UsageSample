@@ -1,5 +1,5 @@
 {
     "rootPath": "C:\\Temp",
     "ipAddress": "localhost:13579",
-    "dataSource": "raw_file"
+    "dataSource": "Default"
 }
