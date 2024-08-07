@@ -89,35 +89,30 @@ namespace Stream.Api.Stream.Reader
                 {
                     case "PeriodicDataPacket":
                         {
-                            Console.WriteLine("Received a periodic packet");
                             var periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
                             HandlePeriodicPacket(periodicDataPacket);
                             break;
                         }
                     case "RowDataPacket":
                         {
-                            Console.WriteLine("Received a row packet");
                             var rowDataPacket = RowDataPacket.Parser.ParseFrom(content);
                             HandleRowData(rowDataPacket);
                             break;
                         }
                     case "MarkerPacket":
                         {
-                            Console.WriteLine("Received a marker packet");
                             var markerPacket = MarkerPacket.Parser.ParseFrom(content);
                             HandleMarkerPacket(markerPacket);
                             break;
                         }
                     case "MetadataPacket":
                         {
-                            Console.WriteLine("Received a metadata packet");
                             var metadataPacket = MetadataPacket.Parser.ParseFrom(content);
                             HandleMetadataPacket(metadataPacket);
                             break;
                         }
                     case "EventPacket":
                         {
-                            Console.WriteLine("Received a event packet");
                             var eventPacket = EventPacket.Parser.ParseFrom(content);
                             HandleEventPacket(eventPacket);
                             break;

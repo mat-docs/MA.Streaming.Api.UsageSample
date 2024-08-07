@@ -11,7 +11,9 @@ namespace Stream.Api.Stream.Reader
         private static void Main()
         {
             var config = LoadJson("./Config/Config.json");
-            var streamApiClient = new StreamApiClient(config.rootPath);
+            var atlasSessionWriter = new AtlasSessionWriter(config.dbPath);
+            var streamApiClient = new StreamApiClient(config.rootPath, atlasSessionWriter, config.dataSource);
+            atlasSessionWriter.Initialise();
             streamApiClient.Initialise(config.ipAddress);
             var dataSource = config.dataSource;
 

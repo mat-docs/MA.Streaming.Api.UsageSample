@@ -9,4 +9,9 @@ namespace Stream.Api.Stream.Reader
         public double Data2 { get; set; }
         public double Data3 { get; set; }
     }
+
+    public class EventSql : EventText
+    {
+        public double[] Data { get; set; }
+    }
 }

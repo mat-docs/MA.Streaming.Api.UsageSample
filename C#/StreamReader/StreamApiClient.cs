@@ -8,17 +8,24 @@ namespace Stream.Api.Stream.Reader
         // This is the Stream API client that manages the sessions based off the calls given by the Stream API server.
         private readonly CancellationTokenSource cancellationTokenSourceSession = new CancellationTokenSource();
         private readonly CancellationTokenSource cancellationTokenSourceEvents = new CancellationTokenSource();
+        private readonly AtlasSessionWriter atlasSessionWriter;
         private ConnectionManagerService.ConnectionManagerServiceClient? connectionManagerServiceClient;
         private SessionManagementService.SessionManagementServiceClient? sessionManagementServiceClient;
         private readonly Dictionary<string, TextSession> streamSessionKeyToTextSessions =
             new Dictionary<string, TextSession>();
         private string rootFolderPath;
+        private Dictionary<string, BatchSession> streamSessionKeyToSqlRaceBatchSessions = new Dictionary<string, BatchSession>();
+        private Dictionary<string, Session> streamSessionKeyToSqlRaceSessions = new Dictionary<string, Session>();
         private Dictionary<string, DateTime> streams = new Dictionary<string, DateTime>();
+        private AtlasSessionHandler atlasSessionHandler;
         private string previousSessionKey;
+        private string dataSource;
 
-        public StreamApiClient(string rootFolderPath)
+        public StreamApiClient(string rootFolderPath, AtlasSessionWriter atlasSessionWriter, string dataSource)
         {
             this.rootFolderPath = rootFolderPath;
+            this.atlasSessionWriter = atlasSessionWriter;
+            this.dataSource = dataSource;
         }
 
         /// <summary>
@@ -31,6 +38,7 @@ namespace Stream.Api.Stream.Reader
             RemoteStreamingApiClient.Initialise(serverAddress);
             connectionManagerServiceClient = RemoteStreamingApiClient.GetConnectionManagerClient();
             sessionManagementServiceClient = RemoteStreamingApiClient.GetSessionManagementClient();
+            this.atlasSessionHandler = new AtlasSessionHandler(atlasSessionWriter, dataSource);
         }
 
         /// <summary>
@@ -111,7 +119,8 @@ namespace Stream.Api.Stream.Reader
                     while (await stopNotificationStream.MoveNext(cancellationToken))
                     {
                         var stopNotificationResponse = stopNotificationStream.Current;
-                        streamSessionKeyToTextSessions[stopNotificationResponse.SessionKey].EndSession();
+                            //streamSessionKeyToSqlRaceBatchSessions[stopNotificationResponse.SessionKey].EndSession();
+                            streamSessionKeyToSqlRaceSessions[stopNotificationResponse.SessionKey].EndSession();
                         Console.WriteLine($"Session Ended {stopNotificationResponse.SessionKey}.");
                         return;
                     }
@@ -133,8 +142,12 @@ namespace Stream.Api.Stream.Reader
                 Console.WriteLine($"New Live Session found with key {sessionKey}.");
                 var request = new GetSessionInfoRequest() { SessionKey = sessionKey };
                 var sessionResponse = sessionManagementServiceClient.GetSessionInfo(request);
-                streamSessionKeyToTextSessions[sessionKey] = new TextSession(rootFolderPath, sessionResponse.Identifier == "" ? "Untitled" : sessionResponse.Identifier,
-                    sessionKey, sessionResponse.DataSource);
+                var sqlSession = atlasSessionWriter.CreateSession(
+                    sessionResponse.Identifier == "" ? "Untitled" : sessionResponse.Identifier, sessionResponse.Type);
+                //streamSessionKeyToSqlRaceBatchSessions[sessionKey] = new BatchSession(this.atlasSessionHandler, sqlSession, sessionKey, atlasSessionWriter,
+                //    sessionResponse.DataSource);
+                streamSessionKeyToSqlRaceSessions[sessionKey] =
+                    new Session(sqlSession, sessionKey, atlasSessionWriter, dataSource);
                 SubscribeToStopNotification(sessionResponse.DataSource);
                 QuerySessionInfo(sessionKey);
             }
@@ -150,7 +163,8 @@ namespace Stream.Api.Stream.Reader
             var request = new GetSessionInfoRequest() { SessionKey = sessionKey };
             var sessionResponse = sessionManagementServiceClient.GetSessionInfo(request);
             var newStreams = sessionResponse.Streams.Where(i => !streams.Keys.Contains(i)).ToList();
-            streamSessionKeyToTextSessions[sessionKey].sessionName = sessionResponse.Identifier;
+            //streamSessionKeyToSqlRaceBatchSessions[sessionKey].UpdateSessionInfo(sessionResponse);
+            streamSessionKeyToSqlRaceSessions[sessionKey].UpdateSessionInfo(sessionResponse);
             if (newStreams.Any() || previousSessionKey != sessionKey)
             {
                 previousSessionKey = sessionKey;
@@ -180,7 +194,8 @@ namespace Stream.Api.Stream.Reader
                     var connectionResponse = connectionManagerServiceClient.NewConnection(new NewConnectionRequest()
                         { Details = connectionDetails });
                     var cancellationToken = cancellationTokenSourceSession.Token;
-                    streamSessionKeyToTextSessions[sessionKey].ReadPackets(cancellationToken, connectionResponse.Connection);
+                    //streamSessionKeyToSqlRaceBatchSessions[sessionKey].ReadPackets(cancellationToken, connectionResponse.Connection);
+                    streamSessionKeyToSqlRaceSessions[sessionKey].ReadPackets(cancellationToken, connectionResponse.Connection);
                 });
             }
             return sessionResponse.IsComplete;

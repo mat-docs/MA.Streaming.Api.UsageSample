@@ -6,4 +6,9 @@
         public double Value { get; set; }
         public long Timestamp { get; set; }
     }
+
+    public class ParameterSql : ParameterText
+    {
+
+    }
 }

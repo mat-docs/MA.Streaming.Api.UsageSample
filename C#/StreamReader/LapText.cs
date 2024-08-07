@@ -9,4 +9,8 @@
         public string Source { get; set; }
         public long Value { get; set; }
     }
+
+    public class LapSql : LapText
+    {
+    }
 }
