@@ -204,7 +204,6 @@ namespace Stream.Api.Stream.Reader
             try
             {
                 config.Commit();
-                //clientSession.Session.LoadConfiguration();
                 Console.WriteLine($"Succesfully added configuration {configIdentifier}");
             }
             catch (ConfigurationSetAlreadyExistsException)
@@ -266,7 +265,7 @@ namespace Stream.Api.Stream.Reader
             }
         }
 
-        public void AddBasicParameterConfigurations(IClientSession clientSession, List<string> parameterIdentifiers)
+        public void AddBasicParameterConfiguration(IClientSession clientSession, List<string> parameterIdentifiers)
         {
             var configSetIdentifier = Guid.NewGuid().ToString();
             var configSetManager = new ConfigurationSetManager();
@@ -305,7 +304,6 @@ namespace Stream.Api.Stream.Reader
             try
             {
                 config.Commit();
-                //clientSession.Session.LoadConfiguration();
                 Console.WriteLine($"Successfully added configuration {configSetIdentifier}");
             }
             catch (ConfigurationSetAlreadyExistsException)
@@ -318,11 +316,11 @@ namespace Stream.Api.Stream.Reader
             }
         }
 
-        public void AddBasicEventConfigurations(IClientSession clientSession, List<string> eventIdentifiers)
+        public void AddBasicEventConfiguration(IClientSession clientSession, List<string> eventIdentifiers)
         {
             var configSetIdentifier = Guid.NewGuid().ToString();
             var configSetManager = new ConfigurationSetManager();
-            var config = configSetManager.Create(connectionString, clientSession.Session.Identifier, "");
+            var config = configSetManager.Create(connectionString, configSetIdentifier, "");
             foreach (string eventIdentifier in eventIdentifiers)
             {
                 config.AddConversion(defaultConversion);
@@ -365,7 +363,7 @@ namespace Stream.Api.Stream.Reader
         {
             var configSetIdentifier = Guid.NewGuid().ToString();
             var configSetManager = new ConfigurationSetManager();
-            var config = configSetManager.Create(connectionString, clientSession.Session.Identifier, "");
+            var config = configSetManager.Create(connectionString, configSetIdentifier, "");
             config.AddConversion(defaultConversion);
             var parameterGroup = new ParameterGroup("Stream API");
             config.AddParameterGroup(parameterGroup);
@@ -459,15 +457,19 @@ namespace Stream.Api.Stream.Reader
             clientSession.Session.Markers.Add(marker);
         }
 
-        public void AddEvent(IClientSession clientSession, string eventIdentifier, long timestamp, List<double> data,
-            string groupName = "")
+        public void AddEvent(IClientSession clientSession, string eventIdentifier, long timestamp, IList<double> data,
+            string groupName = "Stream API")
         {
             clientSession.Session.LoadConfiguration();
-            var eventDefinition = this.eventService.AddEventDefinition(clientSession.Session.Key, eventIdentifier, EventPriorityType.Low,
-                "Stream API", true);
-            this.eventService.AddEvent(clientSession.Session.Key, eventDefinition.EventDefinitionId, timestamp);
+            //if (eventDefCache.ContainsKey(eventIdentifier))
+            //{
+            //    eventDefCache[eventIdentifier] = this.eventService.AddEventDefinition(clientSession.Session.Key, eventIdentifier, EventPriorityType.Low,
+            //        eventIdentifier, true);
+            //}
+            //this.eventService.AddEvent(clientSession.Session.Key, eventDefCache[eventIdentifier].EventDefinitionId, timestamp);
+            clientSession.Session.Events.AddEventData(eventDefCache[eventIdentifier].EventDefinitionId, groupName, timestamp, data);
             Console.WriteLine($"Added Event {eventIdentifier}.");
-            //clientSession.Session.Events.AddEventData(eventDefCache[eventIdentifier].EventDefinitionId, groupName, timestamp, data);
+            
         }
 
         public void UpdateSessionInfo(IClientSession clientSession, GetSessionInfoResponse sessionInfo)

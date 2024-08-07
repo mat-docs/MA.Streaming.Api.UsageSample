@@ -188,7 +188,7 @@ namespace Stream.Api.Stream.Reader
             var newParameters = parameterList.Where(x => !sessionWriter.channelIdParameterDictionary.ContainsKey(x)).ToList();
             if (newParameters.Any())
             {
-                sessionWriter.AddBasicParameterConfigurations(clientSession, newParameters);
+                sessionWriter.AddBasicParameterConfiguration(clientSession, newParameters);
             }
 
             var data = new List<double>();
@@ -272,7 +272,7 @@ namespace Stream.Api.Stream.Reader
             var newParameters = parameterList.Where(x => !sessionWriter.channelIdParameterDictionary.ContainsKey(x)).ToList();
             if (newParameters.Any())
             {
-                sessionWriter.AddBasicParameterConfigurations(clientSession, newParameters);
+                sessionWriter.AddBasicParameterConfiguration(clientSession, newParameters);
             }
 
             var parameterDictionary = new Dictionary<string, List<double>>();

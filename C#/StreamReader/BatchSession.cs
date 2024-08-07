@@ -54,7 +54,7 @@ namespace Stream.Api.Stream.Reader
             }, cancellationToken);
         }
 
-        public void HandleNewPacket(Packet packet)
+        public async void HandleNewPacket(Packet packet)
         {
             if (packet.SessionKey != streamApiSessionKey)
             {
@@ -71,25 +71,40 @@ namespace Stream.Api.Stream.Reader
                     case "PeriodicDataPacket":
                         {
                             PeriodicDataPacket periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
-                            handler.Handle(periodicDataPacket);
+                            await Task.Run(async () =>
+                            {
+                                handler.Handle(periodicDataPacket);
+                            });
+                            
                             break;
                         }
                     case "RowDataPacket":
                         {
                             RowDataPacket rowDataPacket = RowDataPacket.Parser.ParseFrom(content);
-                            handler.Handle(rowDataPacket);
+                            await Task.Run(async () =>
+                            {
+                                handler.Handle(rowDataPacket);
+                            });
+                            
                             break;
                         }
                     case "MarkerPacket":
                         {
                             MarkerPacket markerPacket = MarkerPacket.Parser.ParseFrom(content);
-                            handler.Handle(markerPacket);
+                            await Task.Run(async () =>
+                            {
+                                handler.Handle(markerPacket);
+                            });
+                            
                             break;
                         }
                     case "EventPacket":
                         {
                             EventPacket eventPacket = EventPacket.Parser.ParseFrom(content);
-                            handler.Handle(eventPacket);
+                            await Task.Run(async () =>
+                            {
+                                handler.Handle(eventPacket);
+                            });
                             break;
                         }
                     default:

@@ -3,9 +3,7 @@ using MA.Streaming.API;
 using MA.Streaming.Core;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Remote;
-using MESL.SqlRace.Common.Extensions;
 using MESL.SqlRace.Domain;
-using MESL.SqlRace.UI.ValueConverters;
 
 namespace Stream.Api.Stream.Reader
 {
@@ -79,20 +77,18 @@ namespace Stream.Api.Stream.Reader
                 eventIdentifiers.Add(new Tuple<string, EventPacket>(eventIdentifier, packet));
             }
 
-            //var newEvents = eventIdentifiers
-            //    .Select(x => x.Item1)
-            //    .Where(x => !this.sessionWriter.eventDefCache.ContainsKey(x)).ToList();
-            //if (newEvents.Any())
-            //{
-            //    this.sessionWriter.AddBasicEventConfigurations(clientSession, newEvents);
-            //}
+            var newEvents = eventIdentifiers
+                .Select(x => x.Item1)
+                .Where(x => !this.sessionWriter.eventDefCache.ContainsKey(x)).ToList();
+            if (newEvents.Any())
+            {
+                this.sessionWriter.AddBasicEventConfiguration(clientSession, newEvents);
+            }
 
             foreach (var eventTuple in eventIdentifiers)
             {
                 var timestamp = (long)eventTuple.Item2.Timestamp % NumberOfNanosecondsInDay;
-                var values = new List<double>();
-                values.AddRange(eventTuple.Item2.RawValues);
-                sessionWriter.AddEvent(clientSession, eventTuple.Item1, timestamp, values);
+                sessionWriter.AddEvent(clientSession, eventTuple.Item1, timestamp, eventTuple.Item2.RawValues.ToArray());
             }
 
             Interlocked.Exchange(ref this.updated, DateTime.Now.ToOADate());
@@ -119,7 +115,7 @@ namespace Stream.Api.Stream.Reader
 
             if (newParameters.Any())
             {
-                this.sessionWriter.AddBasicParameterConfigurations(clientSession, newParameters);
+                this.sessionWriter.AddBasicParameterConfiguration(clientSession, newParameters);
             }
 
             foreach(var parameter in parameterLists)
@@ -213,7 +209,7 @@ namespace Stream.Api.Stream.Reader
 
             if (newParameters.Any())
             {
-                this.sessionWriter.AddBasicParameterConfigurations(clientSession, newParameters);
+                this.sessionWriter.AddBasicParameterConfiguration(clientSession, newParameters);
             }
 
             foreach(var parameterList in parameterLists)
@@ -282,7 +278,7 @@ namespace Stream.Api.Stream.Reader
                 var timestamp = (long)packet.Timestamp % NumberOfNanosecondsInDay;
                 if (packet.Type == "Lap")
                 {
-                    sessionWriter.AddLap(clientSession, timestamp, (short)packet.Value, packet.Label, true);
+                    sessionWriter.AddLap(clientSession, timestamp, (short)packet.Value, packet.Description, true);
                 }
                 else
                 {
