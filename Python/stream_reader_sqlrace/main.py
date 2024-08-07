@@ -289,7 +289,6 @@ class StreamReaderSql:
             # Set up a handler if we want to terminate early by ctrl+c
             signal.signal(signal.SIGINT, self.terminate_main_task)
             while True:
-                self.session_key = None
                 # Get the latest live session
                 current_session_response = session_management_stub.GetCurrentSessions(
                     api_pb2.GetCurrentSessionsRequest(data_source=self.data_source)
@@ -356,4 +355,6 @@ if __name__ == "__main__":
 
     db_location = r"C:\McLaren Applied\StreamAPIDemo.ssndb"
     with StreamReaderSql(db_location) as stream_recorder:
+        stream_recorder.data_source = "Default"
+        stream_recorder.session_key = "809d2a25-a493-42ba-9fda-0daecfe7fb1c"
         asyncio.run(stream_recorder.main())
