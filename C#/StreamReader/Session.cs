@@ -6,7 +6,7 @@ using MESL.SqlRace.Domain;
 
 namespace Stream.Api.Stream.Reader
 {
-    internal class Session
+    internal class Session : ISession
     {
         // 10^9 * 3600 * 24 = 86400000000000
         private const long NumberOfNanosecondsInDay = 86400000000000;
@@ -105,13 +105,13 @@ namespace Stream.Api.Stream.Reader
             sessionWriter.CloseSession(clientSession);
         }
         //private readonly object readDataLock = new object();
-        public void HandleNewPacket(Packet packet)
+        public Task HandleNewPacket(Packet packet)
         {
             //Console.WriteLine("Received a new packet");
             if (packet.SessionKey != streamApiSessionKey)
             {
                 Console.WriteLine("Session Key does not match. Ignoring the packet.");
-                return;
+                return Task.CompletedTask;
             }
 
             var packetType = packet.Type + "Packet";
@@ -120,22 +120,21 @@ namespace Stream.Api.Stream.Reader
             {
                 switch (packetType)
                 {
-                    //case "ConfigurationPacket":
-                    //    {
-                    //        ConfigurationPacket packetConfig = ConfigurationPacket.Parser.ParseFrom(content);
-                    //        sessionWriter.AddConfiguration(clientSession, packetConfig);
-                    //        break;
-                    //    }
+                    case "ConfigurationPacket":
+                        {
+                            ConfigurationPacket packetConfig = ConfigurationPacket.Parser.ParseFrom(content);
+                            sessionWriter.AddConfiguration(clientSession, packetConfig);
+                            break;
+                        }
                     case "PeriodicDataPacket":
                         {
-                            PeriodicDataPacket periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
+                            PeriodicDataPacket periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content); 
                             HandlePeriodicPacket(periodicDataPacket);
                             //handler.Handle(periodicDataPacket);
                             break;
                         }
                     case "RowDataPacket":
                         {
-
                             RowDataPacket rowDataPacket = RowDataPacket.Parser.ParseFrom(content);
                             HandleRowData(rowDataPacket);
                             //handler.Handle(rowDataPacket);
@@ -148,12 +147,12 @@ namespace Stream.Api.Stream.Reader
                             //handler.Handle(markerPacket);
                             break;
                         }
-                    //case "MetadataPacket":
-                    //    {
-                    //        MetadataPacket metadataPacket = MetadataPacket.Parser.ParseFrom(content);
-                    //        HandleMetadataPacket(metadataPacket);
-                    //        break;
-                    //    }
+                    case "MetadataPacket":
+                        {
+                            MetadataPacket metadataPacket = MetadataPacket.Parser.ParseFrom(content);
+                            HandleMetadataPacket(metadataPacket);
+                            break;
+                        }
                     case "EventPacket":
                         {
                             EventPacket eventPacket = EventPacket.Parser.ParseFrom(content);
@@ -164,7 +163,7 @@ namespace Stream.Api.Stream.Reader
                     default:
                         {
                             Console.WriteLine($"Unable to parse packet {packetType}.");
-                            return;
+                            return Task.CompletedTask;
                         }
                 }
                 this.lastUpdated = DateTime.Now;
@@ -172,7 +171,9 @@ namespace Stream.Api.Stream.Reader
             catch (Exception ex)
             {
                 Console.WriteLine($"Unable to handle packet {packetType} due to {ex.Message}");
+                return Task.CompletedTask;
             }
+            return Task.CompletedTask;
         }
 
         private void HandlePeriodicPacket(PeriodicDataPacket packet)
@@ -338,7 +339,7 @@ namespace Stream.Api.Stream.Reader
         private void HandleMarkerPacket(MarkerPacket packet)
         {
             var timestamp = (long)packet.Timestamp % NumberOfNanosecondsInDay;
-            if (packet.Type == "Lap")
+            if (packet.Type == "Lap Marker")
                 sessionWriter.AddLap(clientSession, timestamp, (short)packet.Value, packet.Label, true);
             else
                 sessionWriter.AddMarker(clientSession, timestamp, packet.Label);
@@ -357,6 +358,11 @@ namespace Stream.Api.Stream.Reader
                     { DataFormatIdentifier = packet.DataFormat.DataFormatIdentifier, DataSource = dataSource }).Event;
             else
                 eventIdentifier = packet.DataFormat.EventIdentifier;
+
+            if (!sessionWriter.eventDefCache.ContainsKey(eventIdentifier))
+            {
+                this.sessionWriter.AddBasicEventConfiguration(clientSession, eventIdentifier);
+            }
 
             var timestamp = (long)packet.Timestamp % NumberOfNanosecondsInDay;
             var values = new List<double>();

@@ -5,33 +5,29 @@ using MESL.SqlRace.Domain;
 
 namespace Stream.Api.Stream.Reader
 {
-    internal class BatchSession
+    internal class BatchSession : ISession
     {
         private AtlasSessionHandler handler;
         private readonly IClientSession clientSession;
-        private readonly string dataSource;
         private readonly PacketReaderService.PacketReaderServiceClient packetReaderServiceClient;
         private readonly AtlasSessionWriter sessionWriter;
         private readonly string streamApiSessionKey;
-        private DateTime lastUpdated;
-        public BatchSession(AtlasSessionHandler handler, IClientSession clientSession, string streamApiSessionKey, AtlasSessionWriter sessionWriter, string dataSource)
+        public BatchSession(AtlasSessionHandler handler, IClientSession clientSession, string streamApiSessionKey, AtlasSessionWriter sessionWriter)
         {
             this.handler = handler;
             this.clientSession = clientSession;
             this.streamApiSessionKey = streamApiSessionKey;
             packetReaderServiceClient = RemoteStreamingApiClient.GetPacketReaderClient();
             this.sessionWriter = sessionWriter;
-            this.dataSource = dataSource;
-            this.lastUpdated = DateTime.Now;
             handler.clientSession = clientSession;
         }
 
-        public void ReadPackets(CancellationToken cancellationToken, Connection connectionDetails)
+        public async void ReadPackets(CancellationToken cancellationToken, Connection connectionDetails)
         {
             var packetStream = packetReaderServiceClient.ReadPackets(new ReadPacketsRequest()
                 { Connection = connectionDetails });
 
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 try
                 {
@@ -54,12 +50,12 @@ namespace Stream.Api.Stream.Reader
             }, cancellationToken);
         }
 
-        public async void HandleNewPacket(Packet packet)
+        public Task HandleNewPacket(Packet packet)
         {
             if (packet.SessionKey != streamApiSessionKey)
             {
                 Console.WriteLine("Session Key does not match. Ignoring the packet.");
-                return;
+                return Task.CompletedTask;
             }
 
             var packetType = packet.Type + "Packet";
@@ -70,8 +66,8 @@ namespace Stream.Api.Stream.Reader
                 {
                     case "PeriodicDataPacket":
                         {
-                            PeriodicDataPacket periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
-                            await Task.Run(async () =>
+                            PeriodicDataPacket periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content); 
+                            Task.Run(() =>
                             {
                                 handler.Handle(periodicDataPacket);
                             });
@@ -81,7 +77,7 @@ namespace Stream.Api.Stream.Reader
                     case "RowDataPacket":
                         {
                             RowDataPacket rowDataPacket = RowDataPacket.Parser.ParseFrom(content);
-                            await Task.Run(async () =>
+                           Task.Run(() =>
                             {
                                 handler.Handle(rowDataPacket);
                             });
@@ -91,7 +87,7 @@ namespace Stream.Api.Stream.Reader
                     case "MarkerPacket":
                         {
                             MarkerPacket markerPacket = MarkerPacket.Parser.ParseFrom(content);
-                            await Task.Run(async () =>
+                            Task.Run(() =>
                             {
                                 handler.Handle(markerPacket);
                             });
@@ -101,7 +97,7 @@ namespace Stream.Api.Stream.Reader
                     case "EventPacket":
                         {
                             EventPacket eventPacket = EventPacket.Parser.ParseFrom(content);
-                            await Task.Run(async () =>
+                            Task.Run(() =>
                             {
                                 handler.Handle(eventPacket);
                             });
@@ -110,15 +106,15 @@ namespace Stream.Api.Stream.Reader
                     default:
                         {
                             Console.WriteLine($"Unable to parse packet {packetType}.");
-                            return;
+                            return Task.CompletedTask;
                         }
                 }
-                this.lastUpdated = DateTime.Now;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Unable to handle packet {packetType} due to {ex.Message}");
             }
+            return Task.CompletedTask;
         }
         public void UpdateSessionInfo(GetSessionInfoResponse sessionInfo)
         {

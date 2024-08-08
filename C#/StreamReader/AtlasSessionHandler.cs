@@ -276,7 +276,7 @@ namespace Stream.Api.Stream.Reader
             foreach (var packet in packets)
             {
                 var timestamp = (long)packet.Timestamp % NumberOfNanosecondsInDay;
-                if (packet.Type == "Lap")
+                if (packet.Type == "Lap Marker")
                 {
                     sessionWriter.AddLap(clientSession, timestamp, (short)packet.Value, packet.Description, true);
                 }

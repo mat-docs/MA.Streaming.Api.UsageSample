@@ -7,7 +7,7 @@ using MA.Streaming.Proto.Client.Remote;
 
 namespace Stream.Api.Stream.Reader
 {
-    internal class TextSession
+    internal class TextSession : ISession
     {
         private readonly PacketReaderService.PacketReaderServiceClient packetReaderServiceClient;
         private readonly DataFormatManagerService.DataFormatManagerServiceClient dataFormatManagerServiceClient;
@@ -15,7 +15,7 @@ namespace Stream.Api.Stream.Reader
         private string eventCsv;
         private string markersCsv;
         private string rootFolderPath;
-        public string sessionName;
+        private string sessionName;
         private DateTime lastUpdated;
         private readonly string streamApiSessionKey;
         private readonly string dataSource;
@@ -66,6 +66,11 @@ namespace Stream.Api.Stream.Reader
                     Console.WriteLine("Failed to read packet stream.");
                 }
             }, cancellationToken);
+        }
+
+        public void UpdateSessionInfo(GetSessionInfoResponse response)
+        {
+            this.sessionName = response.Identifier;
         }
 
         /// <summary>

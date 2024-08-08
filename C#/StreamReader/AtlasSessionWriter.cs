@@ -461,15 +461,7 @@ namespace Stream.Api.Stream.Reader
             string groupName = "Stream API")
         {
             clientSession.Session.LoadConfiguration();
-            //if (eventDefCache.ContainsKey(eventIdentifier))
-            //{
-            //    eventDefCache[eventIdentifier] = this.eventService.AddEventDefinition(clientSession.Session.Key, eventIdentifier, EventPriorityType.Low,
-            //        eventIdentifier, true);
-            //}
-            //this.eventService.AddEvent(clientSession.Session.Key, eventDefCache[eventIdentifier].EventDefinitionId, timestamp);
             clientSession.Session.Events.AddEventData(eventDefCache[eventIdentifier].EventDefinitionId, groupName, timestamp, data);
-            Console.WriteLine($"Added Event {eventIdentifier}.");
-            
         }
 
         public void UpdateSessionInfo(IClientSession clientSession, GetSessionInfoResponse sessionInfo)

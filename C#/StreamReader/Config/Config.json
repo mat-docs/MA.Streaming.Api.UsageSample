@@ -2,5 +2,6 @@
     "rootPath": "C:\\Temp\\",
     "ipAddress": "localhost:13579",
     "dataSource": "Default",
-    "dbPath": "C:\\McLaren Applied\\StreamAPIDemo.ssndb"
+    "dbPath": "C:\\McLaren Applied\\StreamAPIDemo.ssndb",
+    "outputFormat": 3
 }
