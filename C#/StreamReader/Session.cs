@@ -339,7 +339,7 @@ namespace Stream.Api.Stream.Reader
         private void HandleMarkerPacket(MarkerPacket packet)
         {
             var timestamp = (long)packet.Timestamp % NumberOfNanosecondsInDay;
-            if (packet.Type == "Lap Marker")
+            if (packet.Type == "Lap Trigger")
                 sessionWriter.AddLap(clientSession, timestamp, (short)packet.Value, packet.Label, true);
             else
                 sessionWriter.AddMarker(clientSession, timestamp, packet.Label);
