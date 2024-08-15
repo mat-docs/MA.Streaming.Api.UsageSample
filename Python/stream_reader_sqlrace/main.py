@@ -12,6 +12,9 @@ See Also:
 import asyncio
 import logging
 import signal
+from datetime import datetime, timedelta
+from functools import cache
+from collections import deque
 
 import grpc
 import numpy as np
@@ -30,6 +33,11 @@ class StreamReaderSql:
     """Read data from the Stream API and write it to an ATLAS Session"""
 
     def __init__(self, atlas_ssndb_location: str):
+        self.process_queue_task = None
+        self.last_processed = datetime.now()
+        self.packets_to_add = deque()
+        self.identifiers_with_missing_config = set()
+        self.add_missing_config = True
         self.connection = None
         self.session_writer: AtlasSessionWriter
         self.data_source = "SampleDataSource"
@@ -37,12 +45,15 @@ class StreamReaderSql:
         self.stream_api = StreamApi(self.grpc_address)
         self.session_key = None
         self.main_task = None
+        self.is_session_complete = False
         self.atlas_ssndb_location = atlas_ssndb_location
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.process_queue_task.cancel()
+        asyncio.run(self.process_queue())
         self.session_writer.close_session()
         close_session_response = (
             self.stream_api.connection_manager_service_stub.CloseConnection(
@@ -55,16 +66,22 @@ class StreamReaderSql:
             logger.warning("Connection was not successfully closed. ")
 
     async def session_stop(self):
-        async with grpc.aio.insecure_channel(self.grpc_address) as channel:
-            session_management_stub = api_pb2_grpc.SessionManagementServiceStub(channel)
-            async for (
-                stop_notification
-            ) in session_management_stub.GetSessionStopNotification(
-                api_pb2.GetSessionStopNotificationRequest(data_source=self.data_source)
-            ):
-                print(stop_notification.session_key)
-                self.terminate_main_task()
-                self.session_writer.close_session()
+        if not self.is_session_complete:
+            async with grpc.aio.insecure_channel(self.grpc_address) as channel:
+                session_management_stub = api_pb2_grpc.SessionManagementServiceStub(channel)
+                async for (
+                        stop_notification
+                ) in session_management_stub.GetSessionStopNotification(
+                    api_pb2.GetSessionStopNotificationRequest(data_source=self.data_source)
+                ):
+                    print(stop_notification.session_key)
+                    break
+
+        while (datetime.now() - self.last_processed < timedelta(seconds=10)) or (len(self.packets_to_add) > 0):
+            await asyncio.sleep(15)
+        self.terminate_main_task()
+        await self.process_queue()
+        self.session_writer.close_session()
 
     def terminate_main_task(self, *_):
         logger.info("Terminating main task.")
@@ -78,7 +95,8 @@ class StreamReaderSql:
             ):
                 logger.debug("New essential packet received.")
                 new_packet = essentials_packet_response.response[0].packet
-                await self.handle_new_packet(new_packet)
+                await self.deserialize_new_packet(new_packet)
+                await self.process_queue()
 
     async def read_packets(self):
         async with grpc.aio.insecure_channel(self.grpc_address) as channel:
@@ -88,9 +106,83 @@ class StreamReaderSql:
             ):
                 logger.debug("New packet received.")
                 new_packet = new_packet_response.response[0].packet
-                await self.handle_new_packet(new_packet, True)
+                await self.deserialize_new_packet(new_packet, True)
+                if (len(self.identifiers_with_missing_config) > 5000) or (len(self.packets_to_add) > 20_000):
+                    await self.process_queue()
+                else:
+                    await self.schedule_process_queue()
 
-    async def handle_new_packet(
+    @cache
+    def get_cached_parameter_list(self, data_format_identifier):
+        """Get the list of parameter identifiers from the data format identifier.
+
+        Retrieves the list of parameter identifiers from the data format identifier.
+        This assumes that the link between data format identifier and parameter
+        identifiers never change.
+        """
+        data_format_manager_stub = self.stream_api.data_format_manager_service_stub
+        param_list_response = data_format_manager_stub.GetParametersList(
+            api_pb2.GetParametersListRequest(
+                data_source=self.data_source,
+                data_format_identifier=data_format_identifier,
+            )
+        )
+        parameter_identifiers = list(param_list_response.parameters)
+        return parameter_identifiers
+
+    async def handle_packet_missing_config(self, packet, parameter_identifiers):
+        """Process the packet for missing config.
+
+        Args:
+            packet: packet
+            parameter_identifiers: list of parameter identifiers within the packet
+
+        Returns:
+            True if there is missing config.
+        """
+        missing_config = False
+        for parameter_identifier in parameter_identifiers:
+            if len(parameter_identifier.split(":")) == 1:
+                parameter_identifier += ":StreamAPI"
+            if parameter_identifier not in self.session_writer.parameter_channel_id_mapping.keys():
+                self.identifiers_with_missing_config.add(parameter_identifier)
+                missing_config = True
+
+        if not missing_config:
+            return missing_config
+
+        self.packets_to_add.append(packet)
+        logger.debug("Missing config packet added to queue")
+        if (len(self.identifiers_with_missing_config) > 10000) or (len(self.packets_to_add) > 2000):
+            await self.process_queue()
+        else:
+            await self.schedule_process_queue()
+        return missing_config
+
+    async def schedule_process_queue(self):
+        if self.process_queue_task:
+            self.process_queue_task.cancel()
+
+        self.process_queue_task = asyncio.create_task(self.delayed_process_queue())
+
+    async def delayed_process_queue(self):
+        try:
+            await asyncio.sleep(5)
+            await self.process_queue()
+        except asyncio.CancelledError:
+            pass
+
+    async def process_queue(self):
+        self.session_writer.add_missing_configration(list(self.identifiers_with_missing_config.copy()))
+        self.identifiers_with_missing_config.clear()
+        packets_to_add = self.packets_to_add.copy()
+        self.packets_to_add.clear()
+
+        logger.info("Processing missing packet queue.")
+
+        await asyncio.gather(*[self.route_new_packet(packets) for packets in packets_to_add])
+
+    async def deserialize_new_packet(
         self, new_packet: open_data_pb2.Packet, match_session_key: bool = False
     ):
         """Decodes new protobuf packets received from the Stream API.
@@ -103,6 +195,8 @@ class StreamReaderSql:
         packet_type = new_packet.type
         content = new_packet.content
         session_key = new_packet.session_key
+
+        self.last_processed = datetime.now()
 
         # discard the packet if the session key does not match
         if match_session_key and (session_key != self.session_key):
@@ -120,6 +214,11 @@ class StreamReaderSql:
             )
             return
 
+        self.packets_to_add.append(packet)
+
+
+    async def route_new_packet(self, packet):
+        self.last_processed = datetime.now()
         if isinstance(packet, open_data_pb2.PeriodicDataPacket):
             logger.debug("Periodic packet received.")
             await self.handle_periodic_packet(packet)
@@ -135,9 +234,11 @@ class StreamReaderSql:
         elif isinstance(packet, open_data_pb2.ConfigurationPacket):
             logger.debug("Config packet received.")
             await self.handle_configuration_packet(packet)
+        else:
+            logger.info("Unknown packet type, discarded packet %s", packet.__class__)
 
     async def handle_configuration_packet(
-        self, packet: open_data_pb2.ConfigurationPacket
+            self, packet: open_data_pb2.ConfigurationPacket
     ):
         # Create a corresponding config in atlas
         self.session_writer.add_configration(packet)
@@ -145,14 +246,8 @@ class StreamReaderSql:
     async def handle_periodic_packet(self, packet: open_data_pb2.PeriodicDataPacket):
         ##  Get the parameter identifier
         if packet.data_format.data_format_identifier != 0:
-            data_format_manager_stub = self.stream_api.data_format_manager_service_stub
-            param_list_response = data_format_manager_stub.GetParametersList(
-                api_pb2.GetParametersListRequest(
-                    data_source=self.data_source,
-                    data_format_identifier=packet.data_format.data_format_identifier,
-                )
-            )
-            parameter_identifiers = param_list_response.parameters
+            data_format_identifier = packet.data_format.data_format_identifier
+            parameter_identifiers = self.get_cached_parameter_list(data_format_identifier)
         else:
             parameter_identifiers = (
                 packet.data_format.parameter_identifiers.parameter_identifiers
@@ -161,6 +256,14 @@ class StreamReaderSql:
         assert len(parameter_identifiers) == len(
             packet.columns
         ), "The number of parameter identifiers should match the number of columns"
+
+        # add config if there are no config for the parameters
+        if self.add_missing_config:
+            if await self.handle_packet_missing_config(packet, parameter_identifiers):
+                # If there are missing config then the packet is added to the queue and
+                # we return early
+                return
+
         ## Get the periodic data
         start_time = packet.start_time
         interval = packet.interval
@@ -180,19 +283,13 @@ class StreamReaderSql:
             if not self.session_writer.add_data(
                 parameter_identifier, data_for_param, timestamps_sqlrace
             ):
-                logger.warning("Failed to add data.")
+                logger.warning("Failed to add data for parameter %s",parameter_identifier)
 
     async def handle_row_packet(self, packet: open_data_pb2.RowDataPacket):
         ##  Get the parameter identifier
         if packet.data_format.data_format_identifier != 0:
-            data_format_manager_stub = self.stream_api.data_format_manager_service_stub
-            param_list_response = data_format_manager_stub.GetParametersList(
-                api_pb2.GetParametersListRequest(
-                    data_source=self.data_source,
-                    data_format_identifier=packet.data_format.data_format_identifier,
-                )
-            )
-            parameter_identifiers = list(param_list_response.parameters)
+            data_format_identifier = packet.data_format.data_format_identifier
+            parameter_identifiers = self.get_cached_parameter_list(data_format_identifier)
         else:
             parameter_identifiers = (
                 packet.data_format.parameter_identifiers.parameter_identifiers
@@ -206,6 +303,13 @@ class StreamReaderSql:
         assert len(packet.timestamps) == len(packet.rows), (
             "The number of timestamps" "should match the number of rows."
         )
+
+        # add config if there are no config for the parameters
+        if self.add_missing_config:
+            if await self.handle_packet_missing_config(packet, parameter_identifiers):
+                # If there are missing config then the packet is added to the queue and
+                # we return early
+                return
 
         df = pd.DataFrame(
             columns=parameter_identifiers, index=pd.Index([]), dtype=float
@@ -229,13 +333,13 @@ class StreamReaderSql:
         ## Add the data to the session
         # add the data to the session
         for name, column in df.items():
-            column.dropna(inplace=True)
+            column = column.dropna()
             if column.size == 0:
                 continue
             if not self.session_writer.add_data(
-                name, column.values.tolist(), column.index.tolist()
+                    str(name), column.values.tolist(), column.index.tolist()
             ):
-                logger.warning("Failed to add data.")
+                logger.warning("Failed to add data for parameter %s", str(name))
 
     async def handle_marker_packet(self, packet: open_data_pb2.MarkerPacket):
         if packet.type == "Lap Trigger":
@@ -285,76 +389,75 @@ class StreamReaderSql:
         connection_management_stub = self.stream_api.connection_manager_service_stub
         session_management_stub = self.stream_api.session_management_service_stub
 
+        # TODO: update log messages now that we can feed in session key directly.
+        # Set up a handler if we want to terminate early by ctrl+c
+        signal.signal(signal.SIGINT, self.terminate_main_task)
+        # Get the latest live session
+        current_session_response = session_management_stub.GetCurrentSessions(
+            api_pb2.GetCurrentSessionsRequest(data_source=self.data_source)
+        )
+
+        for test_key in current_session_response.session_keys[::-1]:
+            session_info_response = session_management_stub.GetSessionInfo(
+                api_pb2.GetSessionInfoRequest(session_key=test_key)
+            )
+            if not session_info_response.is_complete:
+                self.session_key = test_key
+                logger.info("Identified live session %s", self.session_key)
+                break
+
+        # if there is no live session wait for a new one to start
+        if self.session_key is None:
+            logger.info("No live session found, waiting for new session to start.")
+            for new_session in session_management_stub.GetSessionStartNotification(
+                    api_pb2.GetSessionStartNotificationRequest(data_source=self.data_source)
+            ):
+                self.session_key = new_session.session_key
+                logger.info("Identified live session %s", self.session_key)
+                break
+
+        session_info_response = session_management_stub.GetSessionInfo(
+            api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+        )
+        self.is_session_complete = session_info_response.is_complete
+
+        # Establish a new connection
+        connection_details = api_pb2.ConnectionDetails(
+            data_source=self.data_source,
+            session=self.session_key,
+            main_offset=session_info_response.main_offset,
+            essentials_offset=session_info_response.essentials_offset,
+        )
+
+        connection_response = connection_management_stub.NewConnection(
+            api_pb2.NewConnectionRequest(details=connection_details)
+        )
+
+        self.connection = connection_response.connection
+
+        # Create a corresponding ATLAS session
+        self.session_writer = AtlasSessionWriter(self.atlas_ssndb_location)
+
+        # Read essential stream which contains essential information such as configs
+        # TODO: optional essentials
+        # await self.read_essentials()
+
+        # Read packets and monitor session stop at the same time
+        self.main_task = asyncio.gather(
+            self.session_stop(),
+            self.read_packets(),
+        )
         try:
-            # Set up a handler if we want to terminate early by ctrl+c
-            signal.signal(signal.SIGINT, self.terminate_main_task)
-            while True:
-                # Get the latest live session
-                current_session_response = session_management_stub.GetCurrentSessions(
-                    api_pb2.GetCurrentSessionsRequest(data_source=self.data_source)
-                )
-
-                for test_key in current_session_response.session_keys[::-1]:
-                    session_info_response = session_management_stub.GetSessionInfo(
-                        api_pb2.GetSessionInfoRequest(session_key=test_key)
-                    )
-                    if not session_info_response.is_complete:
-                        self.session_key = test_key
-                        logger.info("Identified live session %s", self.session_key)
-                        break
-
-                # if there is no live session wait for a new one to start
-                if self.session_key is None:
-                    logger.info("No live session found, waiting for new session to start.")
-                    for new_session in session_management_stub.GetSessionStartNotification(
-                        api_pb2.GetSessionStartNotificationRequest(data_source=self.data_source)
-                    ):
-                        self.session_key = new_session.session_key
-                        logger.info("Identified live session %s", self.session_key)
-                        break
-
-                session_info_response = session_management_stub.GetSessionInfo(
-                    api_pb2.GetSessionInfoRequest(session_key=self.session_key)
-                )
-
-                # Establish a new connection
-                connection_details = api_pb2.ConnectionDetails(
-                    data_source=self.data_source,
-                    session=self.session_key,
-                    main_offset=session_info_response.main_offset,
-                    essentials_offset=session_info_response.essentials_offset,
-                )
-
-                connection_response = connection_management_stub.NewConnection(
-                    api_pb2.NewConnectionRequest(details=connection_details)
-                )
-
-                self.connection = connection_response.connection
-
-                # Create a corresponding ATLAS session
-                self.session_writer = AtlasSessionWriter(self.atlas_ssndb_location)
-
-                # Read essential stream which contains essential information such as configs
-                await self.read_essentials()
-
-                # Read packets and monitor session stop at the same time
-                self.main_task = asyncio.gather(
-                    self.session_stop(),
-                    self.read_packets(),
-                )
-                try:
-                    logger.debug("Starting main task.")
-                    await self.main_task
-                except asyncio.CancelledError:
-                    logger.info("Terminating...")
-        except KeyboardInterrupt:
+            logger.debug("Starting main task.")
+            await self.main_task
+        except asyncio.CancelledError:
             logger.info("Terminating...")
 
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s	%(thread)d %(levelname)s %(name)s %(message)s")
 
     db_location = r"C:\McLaren Applied\StreamAPIDemo.ssndb"
     with StreamReaderSql(db_location) as stream_recorder:
         stream_recorder.data_source = "Default"
-        stream_recorder.session_key = "809d2a25-a493-42ba-9fda-0daecfe7fb1c"
         asyncio.run(stream_recorder.main())

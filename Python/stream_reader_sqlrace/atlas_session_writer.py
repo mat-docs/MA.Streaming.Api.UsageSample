@@ -2,6 +2,7 @@ import os
 import logging
 import struct
 import datetime
+import time
 from typing import List
 
 from ma.streaming.open_data.v1 import open_data_pb2
@@ -290,6 +291,9 @@ class AtlasSessionWriter:
         Returns:
             True if the config is found and data added.
         """
+        # if there are no app group for parameter identifier
+        if len(parameter_identifier.split(":")) == 1:
+            parameter_identifier = parameter_identifier+":StreamAPI"
         try:
             channel_id = self.parameter_channel_id_mapping[parameter_identifier]
         except KeyError:
@@ -351,6 +355,7 @@ class AtlasSessionWriter:
         # Close the session if one was created
         if self.sql_race_connection is not None:
             self.sql_race_connection.close_session()
+            self.sql_race_connection = None
 
     def add_details(self, key, value):
         """Add a session detail to the session."""
@@ -369,3 +374,36 @@ class AtlasSessionWriter:
         self.session.Events.AddEventData(
             event_definition_key, "", event_time, raw_data  # default to no group name
         )
+
+    def add_missing_configration(self, parameter_identifiers: List[str]):
+        missing_config = open_data_pb2.ConfigurationPacket()
+        parameter_definitions = []
+        for parameter_identifier in parameter_identifiers:
+            if parameter_identifier not in self.parameter_channel_id_mapping.keys():
+                param_def = self.build_parameter_definition_packet(*parameter_identifier.split(":"))
+                parameter_definitions.append(param_def)
+        config_id = str(time.time_ns())
+        config_packet = open_data_pb2.ConfigurationPacket(
+            config_id=config_id,
+            parameter_definitions=parameter_definitions,
+        )
+        if len(parameter_definitions) != 0:
+            logger.info("Adding missing config for %i parameters.", len(parameter_definitions))
+            self.add_configration(config_packet)
+
+    def build_parameter_definition_packet(self, name: str, app: str = "StreamAPI"):
+        param_def = open_data_pb2.ParameterDefinition(
+            identifier=f"{name}:{app}",
+            name=name,
+            application_name=app,
+            description="",
+            groups=[""],
+            units="",
+            data_type=open_data_pb2.DATA_TYPE_FLOAT64,
+            format_string="6.3f",
+            max_value=100,
+            min_value=0,
+            warning_min_value=0,
+            warning_max_value=100,
+        )
+        return param_def
