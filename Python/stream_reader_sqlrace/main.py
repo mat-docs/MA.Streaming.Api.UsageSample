@@ -25,6 +25,7 @@ from ma.streaming.api.v1 import api_pb2_grpc, api_pb2
 from ma.streaming.open_data.v1 import open_data_pb2
 from stream_api import StreamApi
 from atlas_session_writer import AtlasSessionWriter
+from stream_reader_sqlrace.row_packet_processor import RowPacketProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,6 @@ class StreamReaderSql:
     """Read data from the Stream API and write it to an ATLAS Session"""
 
     def __init__(self, atlas_ssndb_location: str):
-        self.process_queue_task = None
         self.last_processed = datetime.now()
         self.packets_to_add = deque()
         self.identifiers_with_missing_config = set()
@@ -47,13 +47,17 @@ class StreamReaderSql:
         self.main_task = None
         self.is_session_complete = False
         self.atlas_ssndb_location = atlas_ssndb_location
+        self.row_packet_processor: RowPacketProcessor
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.process_queue_task.cancel()
-        asyncio.run(self.process_queue())
+        asyncio.run(self.async_stop())
+
+    async def async_stop(self):
+        await self.process_queue()
+        self.row_packet_processor.stop()
         self.session_writer.close_session()
         close_session_response = (
             self.stream_api.connection_manager_service_stub.CloseConnection(
@@ -80,8 +84,7 @@ class StreamReaderSql:
         while (datetime.now() - self.last_processed < timedelta(seconds=10)) or (len(self.packets_to_add) > 0):
             await asyncio.sleep(15)
         self.terminate_main_task()
-        await self.process_queue()
-        self.session_writer.close_session()
+        await self.async_stop()
 
     def terminate_main_task(self, *_):
         logger.info("Terminating main task.")
@@ -109,8 +112,6 @@ class StreamReaderSql:
                 await self.deserialize_new_packet(new_packet, True)
                 if (len(self.identifiers_with_missing_config) > 5000) or (len(self.packets_to_add) > 20_000):
                     await self.process_queue()
-                else:
-                    await self.schedule_process_queue()
 
     @cache
     def get_cached_parameter_list(self, data_format_identifier):
@@ -155,32 +156,23 @@ class StreamReaderSql:
         logger.debug("Missing config packet added to queue")
         if (len(self.identifiers_with_missing_config) > 10000) or (len(self.packets_to_add) > 2000):
             await self.process_queue()
-        else:
-            await self.schedule_process_queue()
         return missing_config
 
     async def schedule_process_queue(self):
-        if self.process_queue_task:
-            self.process_queue_task.cancel()
-
-        self.process_queue_task = asyncio.create_task(self.delayed_process_queue())
-
-    async def delayed_process_queue(self):
-        try:
-            await asyncio.sleep(5)
+        while (datetime.now() - self.last_processed < timedelta(seconds=30)) or (len(self.packets_to_add) > 0):
+            await asyncio.sleep(15)
             await self.process_queue()
-        except asyncio.CancelledError:
-            pass
 
     async def process_queue(self):
         self.session_writer.add_missing_configration(list(self.identifiers_with_missing_config.copy()))
         self.identifiers_with_missing_config.clear()
-        packets_to_add = self.packets_to_add.copy()
-        self.packets_to_add.clear()
 
-        logger.info("Processing missing packet queue.")
+        packets = []
+        while not (self.packets_to_add.count != 0 and len(packets) < 1000):
+            packets.append(self.packets_to_add.popleft())
+        logger.info("Processing packet queue.")
 
-        await asyncio.gather(*[self.route_new_packet(packets) for packets in packets_to_add])
+        await asyncio.gather(*[self.route_new_packet(packets) for packets in packets])
 
     async def deserialize_new_packet(
         self, new_packet: open_data_pb2.Packet, match_session_key: bool = False
@@ -225,6 +217,10 @@ class StreamReaderSql:
         elif isinstance(packet, open_data_pb2.RowDataPacket):
             logger.debug("Row packet received.")
             await self.handle_row_packet(packet)
+        elif isinstance(packet, open_data_pb2.EventPacket):
+            logger.debug("Event packet received.")
+            pass
+            # await self.handle_event_packet(packet)
         elif isinstance(packet, open_data_pb2.MarkerPacket):
             logger.debug("Marker packet received.")
             await self.handle_marker_packet(packet)
@@ -311,35 +307,7 @@ class StreamReaderSql:
                 # we return early
                 return
 
-        df = pd.DataFrame(
-            columns=parameter_identifiers, index=pd.Index([]), dtype=float
-        )
-
-        ## Get the row data
-        for timestamps_ns, row in zip(packet.timestamps, packet.rows):
-            # Create timestamps and convert them to SQLRace format.
-            timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
-            samples = getattr(row, row.WhichOneof("list")).samples
-            data = [
-                (
-                    s.value
-                    if s.status == open_data_pb2.DataStatus.DATA_STATUS_VALID
-                    else pd.NA
-                )
-                for s in samples
-            ]
-            df.loc[timestamps_sqlrace, :] = data
-
-        ## Add the data to the session
-        # add the data to the session
-        for name, column in df.items():
-            column = column.dropna()
-            if column.size == 0:
-                continue
-            if not self.session_writer.add_data(
-                    str(name), column.values.tolist(), column.index.tolist()
-            ):
-                logger.warning("Failed to add data for parameter %s", str(name))
+        self.row_packet_processor.add_packet_to_queue(packet)
 
     async def handle_marker_packet(self, packet: open_data_pb2.MarkerPacket):
         if packet.type == "Lap Trigger":
@@ -366,6 +334,7 @@ class StreamReaderSql:
                 print(f"Unsupported value type for metadata: {key}")
 
     async def handle_event_packet(self, packet: open_data_pb2.EventPacket):
+        # TODO: deal with missing configs
         if packet.data_format.data_format_identifier != 0:
             data_format_manager_stub = self.stream_api.data_format_manager_service_stub
             event_identifier_response = data_format_manager_stub.GetEvent(
@@ -437,6 +406,7 @@ class StreamReaderSql:
 
         # Create a corresponding ATLAS session
         self.session_writer = AtlasSessionWriter(self.atlas_ssndb_location)
+        self.row_packet_processor = RowPacketProcessor(self.session_writer,self.data_source,self.grpc_address)
 
         # Read essential stream which contains essential information such as configs
         # TODO: optional essentials
@@ -446,6 +416,7 @@ class StreamReaderSql:
         self.main_task = asyncio.gather(
             self.session_stop(),
             self.read_packets(),
+            self.schedule_process_queue(),
         )
         try:
             logger.debug("Starting main task.")
