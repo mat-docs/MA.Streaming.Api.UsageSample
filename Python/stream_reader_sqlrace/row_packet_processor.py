@@ -1,6 +1,6 @@
 import logging
-from functools import cache
-from multiprocessing import Process, Queue, Manager, Lock
+import multiprocessing
+from multiprocessing import Process, Queue, Manager
 from typing import List, Dict
 import pandas as pd
 import numpy as np
@@ -45,7 +45,7 @@ class PacketProcessor():
                 timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
                 samples = getattr(row, row.WhichOneof("list")).samples
                 data = [
-                    (s.value if s.status == open_data_pb2.DataStatus.DATA_STATUS_VALID else pd.NA)
+                    (s.value if s.status == open_data_pb2.DataStatus.DATA_STATUS_VALID else np.nan)
                     for s in samples
                 ]
                 all_timestamps.append(timestamps_sqlrace)
@@ -57,14 +57,12 @@ class PacketProcessor():
 
 class RowPacketProcessor:
 
-    def __init__(self, session_writer, data_source, grpc_address):
-        self.data_source = data_source
+    def __init__(self, session_writer, data_format_cache):
         self.packet_queues: Dict[int, Queue] = dict()
         self.session_writer = session_writer
-        self.grpc_address = grpc_address
-        self.stream_api = StreamApi(self.grpc_address)
+        self.data_format_cache = data_format_cache
         self.queue_threshold = 200
-        self.process_interval = 5
+        self.process_interval = 30
         self.processing_queues = False
 
         # Start the background thread
@@ -77,7 +75,7 @@ class RowPacketProcessor:
 
     def add_packet_to_queue(self, packet: open_data_pb2.RowDataPacket):
         if packet.data_format.data_format_identifier == 0:
-            data_format_identifier = self.get_cached_data_format_identifier(
+            data_format_identifier = self.data_format_cache.get_cached_data_format_identifier(
                 packet.data_format.parameter_identifiers.parameter_identifiers)
         else:
             data_format_identifier = packet.data_format.data_format_identifier
@@ -91,8 +89,9 @@ class RowPacketProcessor:
 
     def schedule_process_queue(self):
         while not self.stop_event.is_set():
-            self.process_queues()
             time.sleep(self.process_interval)
+            self.process_queues(True)
+
 
     def process_queues(self, process_all=False):
         if self.processing_queues:
@@ -102,13 +101,18 @@ class RowPacketProcessor:
         manager = Manager()
         shared_data = manager.dict()
 
-        for data_format_identifier, queue in self.packet_queues.items():
+        sorted_queues = sorted(self.packet_queues.items(), key=lambda item: item[1].qsize(), reverse=True)
+
+        for data_format_identifier, queue in sorted_queues:
             if queue.qsize() >= self.queue_threshold or process_all:
-                parameter_identifiers = self.get_cached_parameter_list(data_format_identifier)
+                parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
                 pp = PacketProcessor(data_format_identifier, parameter_identifiers, queue, shared_data)
                 p = Process(target=pp.start_process())
                 p.start()
                 processes.append(p)
+
+            if len(processes) >= multiprocessing.cpu_count():
+                break
 
         logger.info("Processing %i row packet queue", len(processes))
 
@@ -117,12 +121,12 @@ class RowPacketProcessor:
 
         self.processing_queues = False
 
-        # if len(shared_data) > 0:
-        self.write_to_session(shared_data)
+        if len(shared_data) > 0:
+            self.write_to_session(shared_data)
 
     def write_to_session(self, shared_data):
         for data_format_identifier,df in shared_data.items():
-            parameter_identifiers = self.get_cached_parameter_list(data_format_identifier)
+            parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
             for name, column in df.items():
                 column = column.dropna()
                 if column.size == 0:
@@ -131,28 +135,6 @@ class RowPacketProcessor:
                     logger.warning("Failed to add data for parameter %s", str(name))
 
             logger.info("Added row data block of size %s", df.shape)
-
-    @cache
-    def get_cached_data_format_identifier(self, parameter_identifiers: List[str]) -> int:
-        data_format_manager_stub = self.stream_api.data_format_manager_service_stub
-        data_format_identifier_response = data_format_manager_stub.GetParameterDataFormatId(
-            api_pb2.GetParameterDataFormatIdRequest(
-                data_source=self.data_source,
-                parameters=parameter_identifiers
-            )
-        )
-        return data_format_identifier_response.data_format_identifier
-
-    @cache
-    def get_cached_parameter_list(self, data_format_identifier: int) -> List[str]:
-        data_format_manager_stub = self.stream_api.data_format_manager_service_stub
-        param_list_response = data_format_manager_stub.GetParametersList(
-            api_pb2.GetParametersListRequest(
-                data_source=self.data_source,
-                data_format_identifier=data_format_identifier,
-            )
-        )
-        return list(param_list_response.parameters)
 
     def stop(self):
         self.stop_event.set()

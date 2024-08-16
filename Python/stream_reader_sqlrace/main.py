@@ -25,6 +25,7 @@ from ma.streaming.api.v1 import api_pb2_grpc, api_pb2
 from ma.streaming.open_data.v1 import open_data_pb2
 from stream_api import StreamApi
 from atlas_session_writer import AtlasSessionWriter
+from stream_reader_sqlrace.data_format_cache import DataFormatCache
 from stream_reader_sqlrace.row_packet_processor import RowPacketProcessor
 
 logger = logging.getLogger(__name__)
@@ -34,12 +35,12 @@ class StreamReaderSql:
     """Read data from the Stream API and write it to an ATLAS Session"""
 
     def __init__(self, atlas_ssndb_location: str):
+        self.tasks = []
         self.last_processed = datetime.now()
         self.packets_to_add = deque()
         self.identifiers_with_missing_config = set()
         self.add_missing_config = True
         self.connection = None
-        self.session_writer: AtlasSessionWriter
         self.data_source = "SampleDataSource"
         self.grpc_address = "localhost:13579"
         self.stream_api = StreamApi(self.grpc_address)
@@ -47,8 +48,11 @@ class StreamReaderSql:
         self.main_task = None
         self.is_session_complete = False
         self.atlas_ssndb_location = atlas_ssndb_location
-        self.row_packet_processor: RowPacketProcessor
-
+        self.session_writer: AtlasSessionWriter = None
+        self.row_packet_processor: RowPacketProcessor = None
+        self.data_format_cache:DataFormatCache = None
+        self.packet_queue_limit = 200_000
+        self.missing_config_limit = 10_000
     def __enter__(self):
         return self
 
@@ -110,26 +114,6 @@ class StreamReaderSql:
                 logger.debug("New packet received.")
                 new_packet = new_packet_response.response[0].packet
                 await self.deserialize_new_packet(new_packet, True)
-                if (len(self.identifiers_with_missing_config) > 5000) or (len(self.packets_to_add) > 20_000):
-                    await self.process_queue()
-
-    @cache
-    def get_cached_parameter_list(self, data_format_identifier):
-        """Get the list of parameter identifiers from the data format identifier.
-
-        Retrieves the list of parameter identifiers from the data format identifier.
-        This assumes that the link between data format identifier and parameter
-        identifiers never change.
-        """
-        data_format_manager_stub = self.stream_api.data_format_manager_service_stub
-        param_list_response = data_format_manager_stub.GetParametersList(
-            api_pb2.GetParametersListRequest(
-                data_source=self.data_source,
-                data_format_identifier=data_format_identifier,
-            )
-        )
-        parameter_identifiers = list(param_list_response.parameters)
-        return parameter_identifiers
 
     async def handle_packet_missing_config(self, packet, parameter_identifiers):
         """Process the packet for missing config.
@@ -152,25 +136,25 @@ class StreamReaderSql:
         if not missing_config:
             return missing_config
 
-        self.packets_to_add.append(packet)
+        self.packets_to_add.appendleft(packet)
         logger.debug("Missing config packet added to queue")
-        if (len(self.identifiers_with_missing_config) > 10000) or (len(self.packets_to_add) > 2000):
-            await self.process_queue()
         return missing_config
 
     async def schedule_process_queue(self):
         while (datetime.now() - self.last_processed < timedelta(seconds=30)) or (len(self.packets_to_add) > 0):
-            await asyncio.sleep(15)
+            await asyncio.sleep(5)
             await self.process_queue()
+            while len(self.packets_to_add) > self.packet_queue_limit:
+                await self.process_queue()
 
     async def process_queue(self):
         self.session_writer.add_missing_configration(list(self.identifiers_with_missing_config.copy()))
         self.identifiers_with_missing_config.clear()
 
         packets = []
-        while not (self.packets_to_add.count != 0 and len(packets) < 1000):
+        while len(self.packets_to_add) > 0 and len(packets) < self.packet_queue_limit:
             packets.append(self.packets_to_add.popleft())
-        logger.info("Processing packet queue.")
+        logger.info("Processing packet queue. Current queue length: %i", len(self.packets_to_add))
 
         await asyncio.gather(*[self.route_new_packet(packets) for packets in packets])
 
@@ -243,7 +227,7 @@ class StreamReaderSql:
         ##  Get the parameter identifier
         if packet.data_format.data_format_identifier != 0:
             data_format_identifier = packet.data_format.data_format_identifier
-            parameter_identifiers = self.get_cached_parameter_list(data_format_identifier)
+            parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
         else:
             parameter_identifiers = (
                 packet.data_format.parameter_identifiers.parameter_identifiers
@@ -285,7 +269,7 @@ class StreamReaderSql:
         ##  Get the parameter identifier
         if packet.data_format.data_format_identifier != 0:
             data_format_identifier = packet.data_format.data_format_identifier
-            parameter_identifiers = self.get_cached_parameter_list(data_format_identifier)
+            parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
         else:
             parameter_identifiers = (
                 packet.data_format.parameter_identifiers.parameter_identifiers
@@ -406,17 +390,23 @@ class StreamReaderSql:
 
         # Create a corresponding ATLAS session
         self.session_writer = AtlasSessionWriter(self.atlas_ssndb_location)
-        self.row_packet_processor = RowPacketProcessor(self.session_writer,self.data_source,self.grpc_address)
+        self.data_format_cache = DataFormatCache(self.data_source, self.grpc_address)
+        self.row_packet_processor = RowPacketProcessor(self.session_writer, self.data_format_cache)
 
         # Read essential stream which contains essential information such as configs
         # TODO: optional essentials
-        # await self.read_essentials()
+        self.tasks.append(asyncio.create_task(
+            self.read_essentials()
+        ))
 
         # Read packets and monitor session stop at the same time
-        self.main_task = asyncio.gather(
-            self.session_stop(),
-            self.read_packets(),
+        self.tasks.append(asyncio.create_task(
             self.schedule_process_queue(),
+        ))
+
+        self.main_task = asyncio.gather(
+            self.read_packets(),
+            self.session_stop(),
         )
         try:
             logger.debug("Starting main task.")
