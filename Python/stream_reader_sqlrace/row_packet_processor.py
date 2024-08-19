@@ -60,7 +60,7 @@ class RowPacketProcessor:
         self.packet_queues: Dict[int, Queue] = dict()
         self.session_writer = session_writer
         self.data_format_cache = data_format_cache
-        self.queue_threshold = 200
+        self.queue_threshold = 50
         self.process_interval = 30
         self.processing_queues = False
 
@@ -68,9 +68,6 @@ class RowPacketProcessor:
         self.stop_event = threading.Event()
         self.background_thread = threading.Thread(target=self.schedule_process_queue)
         self.background_thread.start()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.stop()
 
     def add_packet_to_queue(self, packet: open_data_pb2.RowDataPacket):
         if packet.data_format.data_format_identifier == 0:
@@ -107,18 +104,28 @@ class RowPacketProcessor:
         sorted_queues = sorted(self.packet_queues.items(), key=lambda item: item[1].qsize(), reverse=True)
 
         max_queue_length = 0
+        in_process_count = 0
+        start_time = time.time()
         for data_format_identifier, queue in sorted_queues:
             max_queue_length = queue.qsize()
-            if len(processes) >= multiprocessing.cpu_count():
+            if time.time() - start_time > self.process_interval * 0.8:
+                logger.info("Terminating early due to timeout.")
                 break
-            if queue.qsize() >= self.queue_threshold or use_all_processors:
+            if queue.qsize() >= self.queue_threshold and len(processes) <= multiprocessing.cpu_count():
                 parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
                 pp = PacketProcessor(data_format_identifier, parameter_identifiers, queue, shared_data)
                 p = Process(target=pp.start_process())
                 p.start()
                 processes.append(p)
+            elif queue.qsize() > 0:
+                if any([p.is_alive for p in processes]) or len(processes) == 0:  # if all the process are finished we break
+                    parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
+                    pp = PacketProcessor(data_format_identifier, parameter_identifiers, queue, shared_data)
+                    pp.start_process()
+                    logger.debug("Process row packet in process with queue size %i.", queue.qsize())
+                    in_process_count += 1
 
-        logger.info("Processing %i row packet queue. Remaining max queue length %i", len(processes), max_queue_length)
+        logger.info("Processing %i out of %i row packet queues. Remaining max queue length %i", len(processes)+in_process_count, len(sorted_queues), max_queue_length)
 
         for p in processes:
             p.join()
