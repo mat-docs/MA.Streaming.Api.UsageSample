@@ -12,13 +12,12 @@ See Also:
 import asyncio
 import logging
 import signal
+import threading
 from datetime import datetime, timedelta
-from functools import cache
 from collections import deque
 
 import grpc
 import numpy as np
-import pandas as pd
 from google.protobuf import wrappers_pb2
 
 from ma.streaming.api.v1 import api_pb2_grpc, api_pb2
@@ -427,8 +426,6 @@ class StreamReaderSql:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s	%(thread)d %(levelname)s %(name)s %(message)s")
 
-    db_location = r"C:\McLaren Applied\StreamAPIDemo.ssndb"
-    with StreamReaderSql(db_location) as stream_recorder:
     data_source = r"MCLA-5JRZTQ3\LOCAL"
     database = "SQLRACE01"
     with StreamReaderSql(data_source,database) as stream_recorder:
