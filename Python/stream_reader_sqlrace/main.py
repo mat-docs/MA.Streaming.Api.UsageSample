@@ -60,7 +60,8 @@ class StreamReaderSql:
         asyncio.run(self.async_stop())
 
     async def async_stop(self):
-        await self.process_queue()
+        while len(self.packets_to_add) > 0:
+            await self.process_queue()
         self.row_packet_processor.stop()
         self.session_writer.close_session()
         close_session_response = (
@@ -141,8 +142,8 @@ class StreamReaderSql:
         return missing_config
 
     async def schedule_process_queue(self):
-        while (datetime.now() - self.last_processed < timedelta(seconds=30)) or (len(self.packets_to_add) > 0):
-            await asyncio.sleep(5)
+        while True:  # Terminated by cancelling main task.
+            await asyncio.sleep(10)
             await self.process_queue()
             while len(self.packets_to_add) > self.packet_queue_limit:
                 await self.process_queue()
@@ -154,12 +155,12 @@ class StreamReaderSql:
         packets = []
         while len(self.packets_to_add) > 0 and len(packets) < self.packet_queue_limit:
             packets.append(self.packets_to_add.popleft())
-        logger.info("Processing packet queue. Current queue length: %i", len(self.packets_to_add))
+        logger.info("Processing %i packets from queue. Remaining queue length: %i", len(packets), len(self.packets_to_add))
 
         await asyncio.gather(*[self.route_new_packet(packets) for packets in packets])
 
     async def deserialize_new_packet(
-        self, new_packet: open_data_pb2.Packet, match_session_key: bool = False
+            self, new_packet: open_data_pb2.Packet, match_session_key: bool = False
     ):
         """Decodes new protobuf packets received from the Stream API.
 
@@ -191,7 +192,6 @@ class StreamReaderSql:
             return
 
         self.packets_to_add.append(packet)
-
 
     async def route_new_packet(self, packet):
         self.last_processed = datetime.now()
@@ -400,13 +400,10 @@ class StreamReaderSql:
         ))
 
         # Read packets and monitor session stop at the same time
-        self.tasks.append(asyncio.create_task(
-            self.schedule_process_queue(),
-        ))
-
         self.main_task = asyncio.gather(
-            self.read_packets(),
             self.session_stop(),
+            self.read_packets(),
+            self.schedule_process_queue(),
         )
         try:
             logger.debug("Starting main task.")
