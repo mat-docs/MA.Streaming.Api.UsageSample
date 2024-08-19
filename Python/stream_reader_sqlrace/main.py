@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class StreamReaderSql:
     """Read data from the Stream API and write it to an ATLAS Session"""
 
-    def __init__(self, atlas_ssndb_location: str):
+    def __init__(self, data_source, database):
         self.tasks = []
         self.last_processed = datetime.now()
         self.packets_to_add = deque()
@@ -47,12 +47,15 @@ class StreamReaderSql:
         self.session_key = None
         self.main_task = None
         self.is_session_complete = False
-        self.atlas_ssndb_location = atlas_ssndb_location
+        self.sqlrace_data_source = data_source
+        self.sqlrace_database = database
         self.session_writer: AtlasSessionWriter = None
         self.row_packet_processor: RowPacketProcessor = None
         self.data_format_cache:DataFormatCache = None
         self.packet_queue_limit = 200_000
-        self.missing_config_limit = 10_000
+        self.missing_config_limit = 200_000
+        self.terminate = threading.Event()
+
     def __enter__(self):
         return self
 
@@ -93,7 +96,9 @@ class StreamReaderSql:
 
     def terminate_main_task(self, *_):
         logger.info("Terminating main task.")
-        self.main_task.cancel()
+        # self.main_task.cancel()
+        self.terminate.set()
+
 
     async def read_essentials(self):
         async with grpc.aio.insecure_channel(self.grpc_address) as channel:
@@ -105,6 +110,8 @@ class StreamReaderSql:
                 new_packet = essentials_packet_response.response[0].packet
                 await self.deserialize_new_packet(new_packet)
                 await self.process_queue()
+                if self.terminate.is_set():
+                    break
 
     async def read_packets(self):
         async with grpc.aio.insecure_channel(self.grpc_address) as channel:
@@ -115,6 +122,8 @@ class StreamReaderSql:
                 logger.debug("New packet received.")
                 new_packet = new_packet_response.response[0].packet
                 await self.deserialize_new_packet(new_packet, True)
+                if self.terminate.is_set():
+                    break
 
     async def handle_packet_missing_config(self, packet, parameter_identifiers):
         """Process the packet for missing config.
@@ -143,18 +152,21 @@ class StreamReaderSql:
 
     async def schedule_process_queue(self):
         while True:  # Terminated by cancelling main task.
-            await asyncio.sleep(10)
+            await asyncio.sleep(30)
             await self.process_queue()
             while len(self.packets_to_add) > self.packet_queue_limit:
                 await self.process_queue()
+            if self.terminate.is_set():
+                break
 
     async def process_queue(self):
         self.session_writer.add_missing_configration(list(self.identifiers_with_missing_config.copy()))
         self.identifiers_with_missing_config.clear()
 
-        packets = []
-        while len(self.packets_to_add) > 0 and len(packets) < self.packet_queue_limit:
-            packets.append(self.packets_to_add.popleft())
+        packets = list(self.packets_to_add)
+        self.packets_to_add.clear()
+        self.packets_to_add.extendleft(packets[self.packet_queue_limit:])
+        packets = packets[:self.packet_queue_limit]
         logger.info("Processing %i packets from queue. Remaining queue length: %i", len(packets), len(self.packets_to_add))
 
         await asyncio.gather(*[self.route_new_packet(packets) for packets in packets])
@@ -261,9 +273,9 @@ class StreamReaderSql:
         # add the data to the session
         for parameter_identifier, data_for_param in zip(parameter_identifiers, data):
             if not self.session_writer.add_data(
-                parameter_identifier, data_for_param, timestamps_sqlrace
+                    parameter_identifier, data_for_param, timestamps_sqlrace
             ):
-                logger.warning("Failed to add data for parameter %s",parameter_identifier)
+                logger.warning("Failed to add data for parameter %s", parameter_identifier)
 
     async def handle_row_packet(self, packet: open_data_pb2.RowDataPacket):
         ##  Get the parameter identifier
@@ -389,7 +401,7 @@ class StreamReaderSql:
         self.connection = connection_response.connection
 
         # Create a corresponding ATLAS session
-        self.session_writer = AtlasSessionWriter(self.atlas_ssndb_location)
+        self.session_writer = AtlasSessionWriter(self.sqlrace_data_source,self.sqlrace_database,session_info_response.identifier)
         self.data_format_cache = DataFormatCache(self.data_source, self.grpc_address)
         self.row_packet_processor = RowPacketProcessor(self.session_writer, self.data_format_cache)
 
@@ -417,5 +429,8 @@ if __name__ == "__main__":
 
     db_location = r"C:\McLaren Applied\StreamAPIDemo.ssndb"
     with StreamReaderSql(db_location) as stream_recorder:
+    data_source = r"MCLA-5JRZTQ3\LOCAL"
+    database = "SQLRACE01"
+    with StreamReaderSql(data_source,database) as stream_recorder:
         stream_recorder.data_source = "Default"
         asyncio.run(stream_recorder.main())

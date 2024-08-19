@@ -6,7 +6,7 @@ import time
 from typing import List
 
 from ma.streaming.open_data.v1 import open_data_pb2
-from stream_reader_sqlrace.sql_race import SQLiteConnection
+from stream_reader_sqlrace.sql_race import SQLRaceDBConnection
 
 logger = logging.getLogger(__name__)
 A10_INSTALL_PATH = r"C:\Program Files\McLaren Applied Technologies\ATLAS 10"
@@ -69,21 +69,23 @@ from MESL.SqlRace.Enumerators import (  # .NET imports, so pylint: disable=wrong
 
 class AtlasSessionWriter:
 
-    def __init__(self, db_location: str = r"C:\McLaren Applied\StreamAPIDemo.ssndb"):
+    def __init__(self, data_source=r"MCLA-5JRZTQ3\LOCAL", database="SQLRACE01",
+                 session_identifier=f"Stream API DEMO {datetime.datetime.now()}"):
         self.sql_race_connection = None
         self.session = None
         self.parameter_channel_id_mapping = {}
-        self.create_sqlrace_session(db_location)
+        self.create_sqlrace_session(data_source,database,session_identifier)
 
-    def create_sqlrace_session(self, db_location: str):
-        sql_race_connection = SQLiteConnection(
-            db_location,
-            session_identifier=f"Stream API DEMO {datetime.datetime.now()}",
+    def create_sqlrace_session(self, data_source: str, database: str, session_identifier):
+        sql_db_connection = SQLRaceDBConnection(
+            data_source,
+            database,
+            session_identifier,
             mode="w",
-            recorder=True,
+            recorder=True
         )
-        self.sql_race_connection = sql_race_connection
-        self.session = sql_race_connection.session
+        self.sql_race_connection = sql_db_connection
+        self.session = sql_db_connection.session
 
     def add_configration(self, packet: open_data_pb2.ConfigurationPacket):
         """Creates parameters in ATLAS Session from the configuration
@@ -111,8 +113,8 @@ class AtlasSessionWriter:
 
         # if we have processed this config previously then we can just use it
         if configSetManager.Exists(
-            DatabaseConnectionInformation(self.session.ConnectionString),
-            config_identifier,
+                DatabaseConnectionInformation(self.session.ConnectionString),
+                config_identifier,
         ):
             logger.info(
                 "Logging config already exist, skip reprocessing logging config. "
@@ -235,7 +237,7 @@ class AtlasSessionWriter:
             # will be applied.
             conversion_function_names = [one_to_one_conversion_name] * 3
             for i, text_conversion_definition in enumerate(
-                event_definition.conversions
+                    event_definition.conversions
             ):
                 if text_conversion_definition.conversion_identifier != "":
                     config.AddConversion(
@@ -275,7 +277,7 @@ class AtlasSessionWriter:
         self.session.UseLoggingConfigurationSet(config.Identifier)
 
     def add_data(
-        self, parameter_identifier: str, data: List[float], timestamps: List[float]
+            self, parameter_identifier: str, data: List[float], timestamps: List[float]
     ) -> bool:
         """Add data to a parameter.
 
@@ -293,7 +295,7 @@ class AtlasSessionWriter:
         """
         # if there are no app group for parameter identifier
         if len(parameter_identifier.split(":")) == 1:
-            parameter_identifier = parameter_identifier+":StreamAPI"
+            parameter_identifier = parameter_identifier + ":StreamAPI"
         try:
             channel_id = self.parameter_channel_id_mapping[parameter_identifier]
         except KeyError:
@@ -308,7 +310,7 @@ class AtlasSessionWriter:
         databytes = bytearray(len(data) * 8)
         for i, value in enumerate(data):
             new_bytes = struct.pack("d", value)
-            databytes[i * 8 : i * 8 + len(new_bytes)] = new_bytes
+            databytes[i * 8: i * 8 + len(new_bytes)] = new_bytes
 
         timestamps_array = Array[Int64](len(timestamps))
         for i, timestamp in enumerate(timestamps):
@@ -321,11 +323,11 @@ class AtlasSessionWriter:
         return True
 
     def add_lap(
-        self,
-        timestamp: int,
-        lap_number: int = 1,
-        lap_name: str = "Lap 1",
-        count_for_fastest_lap: bool = True,
+            self,
+            timestamp: int,
+            lap_number: int = 1,
+            lap_name: str = "Lap 1",
+            count_for_fastest_lap: bool = True,
     ) -> None:
         """Add a new lap to the session.
 
