@@ -1,5 +1,4 @@
-﻿
-namespace Stream.Api.Stream.Reader
+﻿namespace Stream.Api.Stream.Reader.TextSessions
 {
     public class EventText
     {

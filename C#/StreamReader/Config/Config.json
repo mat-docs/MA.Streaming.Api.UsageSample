@@ -3,5 +3,6 @@
     "ipAddress": "localhost:13579",
     "dataSource": "Default",
     "dbPath": "C:\\McLaren Applied\\StreamAPIDemo.ssndb",
-    "outputFormat": 1
+    "outputFormat": 1,
+    "sqlDbConnectionString": ""
 }

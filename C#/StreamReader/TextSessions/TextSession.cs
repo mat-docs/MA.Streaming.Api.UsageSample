@@ -5,7 +5,7 @@ using MA.Streaming.API;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Remote;
 
-namespace Stream.Api.Stream.Reader
+namespace Stream.Api.Stream.Reader.TextSessions
 {
     internal class TextSession : ISession
     {
@@ -25,16 +25,16 @@ namespace Stream.Api.Stream.Reader
         private List<ParameterText> parametersRowRecords = new List<ParameterText>();
         public TextSession(string rootFolderPath, string sessionName, string streamApiSessionKey, string dataSource)
         {
-            this.parameterCsv = rootFolderPath + $"{sessionName}_parameters.csv";
-            this.eventCsv = rootFolderPath + $"{sessionName}_events.csv";
-            this.markersCsv = rootFolderPath + $"{sessionName}_markers.csv";
+            parameterCsv = rootFolderPath + $"{sessionName}_parameters.csv";
+            eventCsv = rootFolderPath + $"{sessionName}_events.csv";
+            markersCsv = rootFolderPath + $"{sessionName}_markers.csv";
             this.rootFolderPath = rootFolderPath;
-            this.packetReaderServiceClient = RemoteStreamingApiClient.GetPacketReaderClient();
-            this.dataFormatManagerServiceClient = RemoteStreamingApiClient.GetDataFormatManagerClient();
+            packetReaderServiceClient = RemoteStreamingApiClient.GetPacketReaderClient();
+            dataFormatManagerServiceClient = RemoteStreamingApiClient.GetDataFormatManagerClient();
             this.sessionName = sessionName;
             this.streamApiSessionKey = streamApiSessionKey;
             this.dataSource = dataSource;
-            this.lastUpdated = DateTime.Now;
+            lastUpdated = DateTime.Now;
         }
 
         /// <summary>
@@ -70,7 +70,7 @@ namespace Stream.Api.Stream.Reader
 
         public void UpdateSessionInfo(GetSessionInfoResponse response)
         {
-            this.sessionName = response.Identifier;
+            sessionName = response.Identifier;
         }
 
         /// <summary>
@@ -79,7 +79,7 @@ namespace Stream.Api.Stream.Reader
         /// <param name="packet"></param>
         public void HandleNewPacket(Packet packet)
         {
-            
+
             if (packet.SessionKey != streamApiSessionKey)
             {
                 Console.WriteLine("Session Key does not match. Ignoring the packet.");
@@ -292,8 +292,12 @@ namespace Stream.Api.Stream.Reader
         {
             lapsRecords.Add(new LapText()
             {
-                Name = packet.Label, Timestamp = packet.Timestamp, Type = packet.Type, Value = packet.Value,
-                Description = packet.Description, Source = packet.Source
+                Name = packet.Label,
+                Timestamp = packet.Timestamp,
+                Type = packet.Type,
+                Value = packet.Value,
+                Description = packet.Description,
+                Source = packet.Source
             });
         }
 
@@ -341,9 +345,9 @@ namespace Stream.Api.Stream.Reader
             } while (DateTime.Now - lastUpdated < TimeSpan.FromSeconds(10));
             var records = parametersPeriodicRecords;
             records.AddRange(parametersRowRecords);
-            this.parameterCsv = this.rootFolderPath + $"{sessionName}_parameters.csv";
-            this.eventCsv = rootFolderPath + $"{sessionName}_events.csv";
-            this.markersCsv = rootFolderPath + $"{sessionName}_markers.csv";
+            parameterCsv = rootFolderPath + $"{sessionName}_parameters.csv";
+            eventCsv = rootFolderPath + $"{sessionName}_events.csv";
+            markersCsv = rootFolderPath + $"{sessionName}_markers.csv";
             using (var writer = new StreamWriter(eventCsv))
             {
                 using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))

@@ -1,8 +1,8 @@
 ﻿using CsvHelper.Configuration;
 
-namespace Stream.Api.Stream.Reader
+namespace Stream.Api.Stream.Reader.TextSessions
 {
-    internal class LapTextMap: ClassMap<LapText>
+    internal class LapTextMap : ClassMap<LapText>
     {
         public LapTextMap()
         {

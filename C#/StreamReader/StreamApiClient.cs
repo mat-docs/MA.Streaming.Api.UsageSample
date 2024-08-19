@@ -1,34 +1,46 @@
-﻿using MA.Streaming.API;
+﻿// <copyright file="StreamApiClient.cs" company="McLaren Applied Ltd.">
+// Copyright (c) McLaren Applied Ltd.</copyright>
+
+using MA.Streaming.API;
 using MA.Streaming.Proto.Client.Remote;
+using Stream.Api.Stream.Reader.SerialSqlRace;
+using Stream.Api.Stream.Reader.SqlServerDb;
+using Stream.Api.Stream.Reader.TextSessions;
 
 namespace Stream.Api.Stream.Reader
 {
+    // This is the Stream API client that manages the sessions based off the calls given by the Stream API server.
     internal class StreamApiClient
     {
-        // This is the Stream API client that manages the sessions based off the calls given by the Stream API server.
-        private readonly CancellationTokenSource cancellationTokenSourceSession = new CancellationTokenSource();
-        private readonly CancellationTokenSource cancellationTokenSourceEvents = new CancellationTokenSource();
         private readonly AtlasSessionWriter atlasSessionWriter;
-        private ConnectionManagerService.ConnectionManagerServiceClient? connectionManagerServiceClient;
-        private SessionManagementService.SessionManagementServiceClient? sessionManagementServiceClient;
-        private string rootFolderPath;
-        private Dictionary<string, DateTime> streams = new Dictionary<string, DateTime>();
-        private Dictionary<string, ISession> streamSessionKeyToSession = new Dictionary<string, ISession>();
-        private AtlasSessionHandler atlasSessionHandler;
-        private int outputFormat;
-        private string previousSessionKey;
-        private string dataSource;
 
-        public StreamApiClient(string rootFolderPath, AtlasSessionWriter atlasSessionWriter, string dataSource, int outputFormat)
+        private readonly CancellationTokenSource cancellationTokenSourceEvents = new();
+
+        private readonly CancellationTokenSource cancellationTokenSourceSession = new();
+
+        private readonly object SessionStartLock = new object();
+
+        private readonly BulkInsertHandler bulkInsertHandler;
+        private ConnectionManagerService.ConnectionManagerServiceClient? connectionManagerServiceClient;
+        private readonly string dataSource;
+        private readonly int outputFormat;
+        private string previousSessionKey;
+        private readonly string rootFolderPath;
+        private SessionManagementService.SessionManagementServiceClient? sessionManagementServiceClient;
+        private readonly Dictionary<string, DateTime> streams = new();
+        private readonly Dictionary<string, ISession> streamSessionKeyToSession = new();
+
+        public StreamApiClient(AtlasSessionWriter atlasSessionWriter, Config config)
         {
-            this.rootFolderPath = rootFolderPath;
+            rootFolderPath = config.rootPath;
             this.atlasSessionWriter = atlasSessionWriter;
-            this.dataSource = dataSource;
-            this.outputFormat = outputFormat;
+            dataSource = config.dataSource;
+            outputFormat = config.outputFormat;
+            bulkInsertHandler = new BulkInsertHandler(config.sqlDbConnectionString);
         }
 
         /// <summary>
-        /// Initialises the Stream API clients based off the given IP Address.
+        ///     Initialises the Stream API clients based off the given IP Address.
         /// </summary>
         /// <param name="serverAddress"></param>
         public void Initialise(string serverAddress)
@@ -37,11 +49,11 @@ namespace Stream.Api.Stream.Reader
             RemoteStreamingApiClient.Initialise(serverAddress);
             connectionManagerServiceClient = RemoteStreamingApiClient.GetConnectionManagerClient();
             sessionManagementServiceClient = RemoteStreamingApiClient.GetSessionManagementClient();
-            this.atlasSessionHandler = new AtlasSessionHandler(atlasSessionWriter, dataSource);
         }
 
         /// <summary>
-        /// Tries to Read the Stream API current sessions list to see if there is any live sessions mid run when the reader is started.
+        ///     Tries to Read the Stream API current sessions list to see if there is any live sessions mid run when the reader is
+        ///     started.
         /// </summary>
         /// <param name="dataSource"></param>
         /// <returns>True if a live session is found. Otherwise, it's False.</returns>
@@ -50,24 +62,23 @@ namespace Stream.Api.Stream.Reader
             var foundLiveSession = false;
             var currentSessionsResponse =
                 sessionManagementServiceClient.GetCurrentSessions(new GetCurrentSessionsRequest()
-                { DataSource = dataSource });
+                    { DataSource = dataSource });
             foreach (var session in currentSessionsResponse.SessionKeys.Reverse())
             {
                 var sessionInfoResponse =
                     sessionManagementServiceClient.GetSessionInfo(new GetSessionInfoRequest() { SessionKey = session });
-                if (sessionInfoResponse.IsComplete)
-                {
-                    continue;
-                }
+                if (sessionInfoResponse.IsComplete) continue;
                 Console.WriteLine($"Found Live session {sessionInfoResponse.Identifier}.");
                 OnSessionStart(session);
                 foundLiveSession = true;
             }
+
             return foundLiveSession;
         }
 
         /// <summary>
-        /// If a live session is not found, then this will wait for a Session Start notification from the Stream API, so it can start Reading data from the server.
+        ///     If a live session is not found, then this will wait for a Session Start notification from the Stream API, so it can
+        ///     start Reading data from the server.
         /// </summary>
         /// <param name="dataSource"></param>
         /// <returns>True if session is found, False if there was an error in subscribing to the stream.</returns>
@@ -83,12 +94,12 @@ namespace Stream.Api.Stream.Reader
                 try
                 {
                     while (!cancellationToken.IsCancellationRequested)
-                        while (await startNotificationStream.MoveNext(cancellationToken))
-                        {
-                            var notificationMessage = startNotificationStream.Current;
-                            OnSessionStart(notificationMessage.SessionKey);
-                            return true;
-                        }
+                    while (await startNotificationStream.MoveNext(cancellationToken))
+                    {
+                        var notificationMessage = startNotificationStream.Current;
+                        OnSessionStart(notificationMessage.SessionKey);
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -99,8 +110,10 @@ namespace Stream.Api.Stream.Reader
             }, cancellationToken);
             return task;
         }
+
         /// <summary>
-        /// Subscribes to the Stop Notification stream to make sure that the recording stops when the session has finished recording by the Stream API.
+        ///     Subscribes to the Stop Notification stream to make sure that the recording stops when the session has finished
+        ///     recording by the Stream API.
         /// </summary>
         /// <param name="dataSource"></param>
         public void SubscribeToStopNotification(string dataSource)
@@ -131,8 +144,6 @@ namespace Stream.Api.Stream.Reader
             }, cancellationToken);
         }
 
-        private readonly object SessionStartLock = new object();
-
         public void OnSessionStart(string sessionKey)
         {
             lock (SessionStartLock)
@@ -140,32 +151,33 @@ namespace Stream.Api.Stream.Reader
                 Console.WriteLine($"New Live Session found with key {sessionKey}.");
                 var request = new GetSessionInfoRequest() { SessionKey = sessionKey };
                 var sessionResponse = sessionManagementServiceClient.GetSessionInfo(request);
-                if (this.outputFormat <= 2)
+                if (outputFormat == 1)
                 {
                     var sqlSession = atlasSessionWriter.CreateSession(
-                        sessionResponse.Identifier == "" ? "Untitled" : sessionResponse.Identifier, sessionResponse.Type);
-                    if (this.outputFormat == 1)
-                    {
-                        streamSessionKeyToSession[sessionKey] = new BatchSession(this.atlasSessionHandler, sqlSession, sessionKey, atlasSessionWriter);
-                    }
-                    else
-                    {
-                        streamSessionKeyToSession[sessionKey] = new Session(sqlSession, sessionKey, atlasSessionWriter, dataSource);
-                    }
+                        sessionResponse.Identifier == "" ? "Untitled" : sessionResponse.Identifier,
+                        sessionResponse.Type);
+                    streamSessionKeyToSession[sessionKey] = new Session(sqlSession, atlasSessionWriter, dataSource);
                 }
-                else
+                else if (outputFormat == 2)
                 {
-                    streamSessionKeyToSession[sessionKey] = new TextSession(this.rootFolderPath,
+                    streamSessionKeyToSession[sessionKey] = new TextSession(rootFolderPath,
                         sessionResponse.Identifier == "" ? "Untitled" : sessionResponse.Identifier, sessionKey,
                         dataSource);
                 }
+                else
+                {
+                    streamSessionKeyToSession[sessionKey] =
+                        new SqlDbSession(dataSource, sessionKey, bulkInsertHandler);
+                }
+
                 SubscribeToStopNotification(sessionResponse.DataSource);
                 QuerySessionInfo(sessionKey);
             }
         }
+
         /// <summary>
-        /// Updates which streams is available for listening to the connection details.
-        /// Allows for dynamic topic creation and listening to all the topics related to that session.
+        ///     Updates which streams is available for listening to the connection details.
+        ///     Allows for dynamic topic creation and listening to all the topics related to that session.
         /// </summary>
         /// <param name="sessionKey"></param>
         /// <returns>True if the session is finished. False if it is not.</returns>
@@ -173,18 +185,12 @@ namespace Stream.Api.Stream.Reader
         {
             var request = new GetSessionInfoRequest() { SessionKey = sessionKey };
             var sessionResponse = sessionManagementServiceClient.GetSessionInfo(request);
-            var newStreams = sessionResponse.Streams.Where(i => !streams.Keys.Contains(i)).ToList();
+            var newStreams = sessionResponse.Streams.Where(i => !streams.ContainsKey(i)).ToList();
             streamSessionKeyToSession[sessionKey].UpdateSessionInfo(sessionResponse);
-            if (newStreams.Any() || previousSessionKey != sessionKey)
-            {
-                previousSessionKey = sessionKey;
+            if (newStreams.Any())
                 _ = Task.Run(() =>
                 {
-
-                    foreach (var newStream in newStreams)
-                    {
-                        streams.Add(newStream, DateTime.Now);
-                    }
+                    foreach (var newStream in newStreams) streams.Add(newStream, DateTime.Now);
 
                     var offsets = new List<Tuple<string, long>>();
                     foreach (var stream in newStreams)
@@ -194,6 +200,7 @@ namespace Stream.Api.Stream.Reader
                             ? new Tuple<string, long>(stream, offset)
                             : new Tuple<string, long>(stream, 0));
                     }
+
                     var connectionDetails = new ConnectionDetails()
                     {
                         DataSource = sessionResponse.DataSource,
@@ -206,7 +213,6 @@ namespace Stream.Api.Stream.Reader
                     var cancellationToken = cancellationTokenSourceSession.Token;
                     streamSessionKeyToSession[sessionKey].ReadPackets(cancellationToken, connectionResponse.Connection);
                 });
-            }
             return sessionResponse.IsComplete;
         }
 
