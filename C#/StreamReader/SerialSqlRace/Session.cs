@@ -3,9 +3,11 @@
 
 using System.Collections.Concurrent;
 using Google.Protobuf.Collections;
+using Grpc.Core;
 using MA.Streaming.API;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Remote;
+using MAT.OCS.FFC.Configuration.Format.Protobuf;
 using MESL.SqlRace.Domain;
 
 namespace Stream.Api.Stream.Reader.SerialSqlRace
@@ -48,37 +50,54 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             sessionWriter.UpdateSessionInfo(clientSession, sessionInfo);
         }
 
-        public void ReadPackets(CancellationToken cancellationToken, Connection connectionDetails)
-        {
-            var packetStream = packetReaderServiceClient.ReadPackets(new ReadPacketsRequest()
-                { Connection = connectionDetails });
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    while (!cancellationToken.IsCancellationRequested)
-                    while (await packetStream.ResponseStream.MoveNext(cancellationToken))
-                    {
-                        var packetResponse = packetStream.ResponseStream.Current;
-                        foreach (var response in packetResponse.Response) HandleNewPacket(response.Packet);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Failed to read packet stream.");
-                }
-            }, cancellationToken);
-        }
 
         public void EndSession()
         {
             // Wait for writing to session to end.
             do
             {
-            } while (DateTime.Now - lastUpdated < TimeSpan.FromSeconds(120));
+            } while (DateTime.Now - lastUpdated < TimeSpan.FromSeconds(30));
 
             sessionWriter.CloseSession(clientSession);
+        }
+
+        public void ReadPackets(CancellationToken cancellationToken, Connection connectionDetails)
+        {
+            var streamReader = CreateStream(connectionDetails)?.ResponseStream;
+
+            if (streamReader == null)
+            {
+                return;
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    while (!cancellationToken.IsCancellationRequested)
+                    while (await streamReader.MoveNext(cancellationToken))
+                    {
+                        var packetResponse = streamReader.Current;
+                        foreach (var response in packetResponse.Response) await HandleNewPacket(response.Packet);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to read stream due to {ex}");
+                }
+                finally
+                {
+                    ReadPackets(cancellationToken, connectionDetails);
+                }
+            }, cancellationToken);
+            
+        }
+
+        private AsyncServerStreamingCall<ReadPacketsResponse>? CreateStream(
+            Connection connectionDetails)
+        {
+            return packetReaderServiceClient.ReadPackets(new ReadPacketsRequest()
+                { Connection = connectionDetails });
         }
 
         private void ConfigProcessor_ProcessEventComplete(object? sender, EventArgs e)
@@ -93,7 +112,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             var dataQueue = rowDataQueue.ToArray();
             rowDataQueue.Clear();
             foreach (var packet in dataQueue)
-                Task.Run(async () => { HandleRowData(packet); });
+                HandleRowData(packet);
         }
 
         private void ConfigProcessor_ProcessPeriodicComplete(object? sender, EventArgs e)
@@ -101,39 +120,39 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             var dataQueue = periodicDataQueue.ToArray();
             periodicDataQueue.Clear();
             foreach (var packet in dataQueue)
-                Task.Run(async () => { HandlePeriodicPacket(packet); });
+                HandlePeriodicPacket(packet);
         }
 
-        public void GetEssentialPacket(CancellationToken cancellationToken, Connection connectionDetails)
-        {
-            var essentialsPacketStream = packetReaderServiceClient.ReadEssentials(new ReadEssentialsRequest()
-                { Connection = connectionDetails }).ResponseStream;
-            var task = Task.Run(async () =>
-            {
-                try
-                {
-                    while (!cancellationToken.IsCancellationRequested)
-                    {
-                        while (await essentialsPacketStream.MoveNext(cancellationToken))
-                        {
-                            var messages = essentialsPacketStream.Current.Response;
+        //public void GetEssentialPacket(CancellationToken cancellationToken, Connection connectionDetails)
+        //{
+        //    var essentialsPacketStream = packetReaderServiceClient.ReadEssentials(new ReadEssentialsRequest()
+        //        { Connection = connectionDetails }).ResponseStream;
+        //    var task = Task.Run(async () =>
+        //    {
+        //        try
+        //        {
+        //            while (!cancellationToken.IsCancellationRequested)
+        //            {
+        //                while (await essentialsPacketStream.MoveNext(cancellationToken))
+        //                {
+        //                    var messages = essentialsPacketStream.Current.Response;
 
-                            foreach (var message in messages)
-                            {
-                                Console.WriteLine($"ESSENTIALS : New Packet {message.Packet.Type}");
-                                HandleNewPacket(message.Packet);
-                            }
-                        }
+        //                    foreach (var message in messages)
+        //                    {
+        //                        Console.WriteLine($"ESSENTIALS : New Packet {message.Packet.Type}");
+        //                        HandleNewPacket(message.Packet);
+        //                    }
+        //                }
 
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Unable to get essentials packet due to {ex.Message}.");
-                }
-            }, cancellationToken);
-        }
+        //                return;
+        //            }
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            Console.WriteLine($"Unable to get essentials packet due to {ex.Message}.");
+        //        }
+        //    }, cancellationToken);
+        //}
 
         public Task HandleNewPacket(Packet packet)
         {
@@ -152,14 +171,13 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     case "PeriodicData":
                     {
                         var periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
-                        Task.Run(async () => { HandlePeriodicPacket(periodicDataPacket); });
-
+                        HandlePeriodicPacket(periodicDataPacket);
                         break;
                     }
                     case "RowData":
                     {
                         var rowDataPacket = RowDataPacket.Parser.ParseFrom(content);
-                        Task.Run(async () => { HandleRowData(rowDataPacket); });
+                        HandleRowData(rowDataPacket);
                         break;
                     }
                     case "Marker":
@@ -197,11 +215,20 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             return Task.CompletedTask;
         }
 
-        private Task HandlePeriodicPacket(PeriodicDataPacket packet)
+        private void HandlePeriodicPacket(PeriodicDataPacket packet)
         {
-            var parameterList = packet.DataFormat.HasDataFormatIdentifier
-                ? GetParameterListAsync(packet.DataFormat.DataFormatIdentifier).Result
-                : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
+            RepeatedField<string> parameterList;
+            try
+            {
+                parameterList = packet.DataFormat.HasDataFormatIdentifier
+                    ? GetParameterList(packet.DataFormat.DataFormatIdentifier)
+                    : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Parameter List Exception {ex}");
+                parameterList = new RepeatedField<string>();
+            }
 
             var newParameters = parameterList
                 .Where(x => !sessionWriter.channelIdPeriodicParameterDictionary.ContainsKey(x)).ToList();
@@ -212,7 +239,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     configProcessor.AddPeriodicPacketParameter(new Tuple<string, uint>(parameter, packet.Interval));
                 periodicDataQueue.Enqueue(packet);
                 lastUpdated = DateTime.Now;
-                return Task.CompletedTask;
+                return;
             }
 
             for (var i = 0; i < parameterList.Count; i++)
@@ -278,15 +305,23 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     }
                 }
             }
-
-            return Task.CompletedTask;
         }
 
-        private Task HandleRowData(RowDataPacket packet)
+        private void HandleRowData(RowDataPacket packet)
         {
-            var parameterList = packet.DataFormat.HasDataFormatIdentifier
-                ? GetParameterListAsync(packet.DataFormat.DataFormatIdentifier).Result
-                : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
+            RepeatedField<string> parameterList;
+            try
+            { 
+                parameterList = packet.DataFormat.HasDataFormatIdentifier
+                    ? GetParameterList(packet.DataFormat.DataFormatIdentifier)
+                    : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Parameter List Exception {ex}");
+                parameterList = new RepeatedField<string>();
+            }
+            
 
             var newParameters = parameterList.Where(x => !sessionWriter.channelIdParameterDictionary.ContainsKey(x))
                 .ToList();
@@ -296,7 +331,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                 configProcessor.AddPacketParameter(newParameters);
                 rowDataQueue.Enqueue(packet);
                 lastUpdated = DateTime.Now;
-                return Task.CompletedTask;
+                return;
             }
 
             for (var i = 0; i < packet.Rows.Count; i++)
@@ -359,7 +394,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                 }
             }
 
-            return Task.CompletedTask;
+            return;
         }
 
         private void HandleMarkerPacket(MarkerPacket packet)
@@ -379,7 +414,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
         private void HandleEventPacket(EventPacket packet)
         {
             var eventIdentifier = packet.DataFormat.HasDataFormatIdentifier
-                ? GetEventIdentifier(packet.DataFormat.DataFormatIdentifier).Result
+                ? GetEventIdentifier(packet.DataFormat.DataFormatIdentifier)
                 : packet.DataFormat.EventIdentifier;
 
             if (!sessionWriter.eventDefCache.ContainsKey(eventIdentifier))
@@ -395,31 +430,32 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             sessionWriter.TryAddEvent(clientSession, eventIdentifier, timestamp, values);
         }
 
-        private async Task<RepeatedField<string>> GetParameterListAsync(ulong dataFormatId)
+        private RepeatedField<string> GetParameterList(ulong dataFormatId)
         {
             if (parameterListDataFormatCache.TryGetValue(dataFormatId, out RepeatedField<string>? parameterList))
                 return parameterList;
 
-            parameterList = dataFormatManagerServiceClient.GetParametersListAsync(new GetParametersListRequest()
+            parameterList = dataFormatManagerServiceClient.GetParametersList(new GetParametersListRequest()
             {
                 DataFormatIdentifier = dataFormatId,
                 DataSource = dataSource
-            }).ResponseAsync.Result.Parameters;
+            }).Parameters;
+
             parameterListDataFormatCache[dataFormatId] = parameterList;
 
             return parameterList;
         }
 
-        private async Task<string> GetEventIdentifier(ulong dataFormatId)
+        private string GetEventIdentifier(ulong dataFormatId)
         {
             if (eventIdentifierDataFormatCache.TryGetValue(dataFormatId, out string? eventIdentifier))
                 return eventIdentifier;
 
-            eventIdentifier = dataFormatManagerServiceClient.GetEventAsync(new GetEventRequest()
+            eventIdentifier = dataFormatManagerServiceClient.GetEvent(new GetEventRequest()
             {
                 DataFormatIdentifier = dataFormatId,
                 DataSource = dataSource
-            }).ResponseAsync.Result.Event;
+            }).Event;
             eventIdentifierDataFormatCache[dataFormatId] = eventIdentifier;
 
             return eventIdentifier;

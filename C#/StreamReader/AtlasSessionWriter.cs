@@ -16,7 +16,6 @@ namespace Stream.Api.Stream.Reader
     internal class AtlasSessionWriter
     {
         private readonly string connectionString;
-        private readonly string dbLocation;
 
         private readonly Dictionary<EventPriority, EventPriorityType> eventPriorityDictionary =
             new()
@@ -41,11 +40,12 @@ namespace Stream.Api.Stream.Reader
         public ConcurrentDictionary<string, EventDefinition> eventDefCache = new();
 
         private SessionManager? sessionManager;
+        private int sampleCounter = 0;
 
-        public AtlasSessionWriter(string dbLocation)
+        public AtlasSessionWriter(string connectionString)
         {
-            this.dbLocation = dbLocation;
-            connectionString = $"DbEngine=SQLite;Data Source={this.dbLocation};Pooling=false;";
+            //connectionString = $"server=MCLA-F8ZLSQ3\\LOCAL;Initial Catalog=SQLRACE01_LOCAL;Trusted_Connection=True;";
+            this.connectionString = connectionString;
         }
 
         public void Initialise()
@@ -91,8 +91,8 @@ namespace Stream.Api.Stream.Reader
             recorderConfiguration.AddConfiguration(
                 Guid.NewGuid(),
                 "SQLite",
-                dbLocation,
-                dbLocation,
+                connectionString,
+                connectionString,
                 connectionString,
                 false
             );
@@ -134,8 +134,8 @@ namespace Stream.Api.Stream.Reader
                 var conversionFuncName = defaultConversionFuncName;
                 var channelId = clientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
                 channelIdParameterDictionary[parameterDefinition.Identifier] = channelId;
-                var parameterChannel = new Channel(channelId, "ParameterChannel", 0, DataType.Double64Bit,
-                    ChannelDataSourceType.RowData);
+                var parameterChannel = new Channel(channelId, parameterDefinition.Name, 0, DataType.Double64Bit,
+                    ChannelDataSourceType.RowData, parameterDefinition.Name);
                 config.AddChannel(parameterChannel);
                 if (parameterDefinition.Conversion != null)
                 {
@@ -238,8 +238,8 @@ namespace Stream.Api.Stream.Reader
             config.AddGroup(applicationGroup);
             var channelId = clientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
             channelIdParameterDictionary[parameterIdentifier] = channelId;
-            var parameterChannel = new Channel(channelId, "Parameter Channel", 0, DataType.Double64Bit,
-                ChannelDataSourceType.RowData);
+            var parameterChannel = new Channel(channelId, parameterIdentifier, 0, DataType.Double64Bit,
+                ChannelDataSourceType.RowData, parameterIdentifier);
             config.AddChannel(parameterChannel);
             var parameter = new Parameter(
                 parameterIdentifier,
@@ -293,8 +293,8 @@ namespace Stream.Api.Stream.Reader
             {
                 var channelId = clientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
                 channelsToAdd[parameter.Item1] = channelId;
-                var parameterChannel = new Channel(channelId, "ParameterChannel", parameter.Item2, DataType.Double64Bit,
-                    ChannelDataSourceType.Periodic);
+                var parameterChannel = new Channel(channelId, parameter.Item1, parameter.Item2, DataType.Double64Bit,
+                    ChannelDataSourceType.Periodic, parameter.Item1);
                 config.AddChannel(parameterChannel);
                 var parameterObj = new Parameter(
                     parameter.Item1,
@@ -352,8 +352,8 @@ namespace Stream.Api.Stream.Reader
             {
                 var channelId = clientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
                 channelsToAdd[parameterIdentifier] = channelId;
-                var parameterChannel = new Channel(channelId, "ParameterChannel", 0, DataType.Double64Bit,
-                    ChannelDataSourceType.RowData);
+                var parameterChannel = new Channel(channelId, parameterIdentifier, 0, DataType.Double64Bit,
+                    ChannelDataSourceType.RowData, parameterIdentifier);
                 config.AddChannel(parameterChannel);
                 var parameter = new Parameter(
                     parameterIdentifier,
@@ -450,6 +450,11 @@ namespace Stream.Api.Stream.Reader
             try
             {
                 var dataBytes = data.SelectMany(BitConverter.GetBytes).ToArray();
+                sampleCounter += data.Count;
+                if (sampleCounter % 10000 == 0)
+                {
+                    Console.WriteLine($"From Periodic, total sample count: {sampleCounter}");
+                }
                 lock (configLock)
                 {
                     clientSession.Session.AddChannelData(channelIdPeriodicParameterDictionary[parameterIdentifier],
@@ -470,12 +475,16 @@ namespace Stream.Api.Stream.Reader
         {
             try
             {
-                if (!channelIdParameterDictionary.ContainsKey(parameterIdentifier))
-                    AddBasicConfiguration(clientSession, parameterIdentifier);
 
                 var channelId = channelIdParameterDictionary[parameterIdentifier];
 
                 var dataBytes = BitConverter.GetBytes(data);
+
+                sampleCounter += 1;
+                if (sampleCounter % 10000 == 0)
+                {
+                    Console.WriteLine($"From Row Data Total Sample count: {sampleCounter}");
+                }
 
                 lock (configLock)
                 {

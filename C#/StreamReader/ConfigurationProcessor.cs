@@ -21,14 +21,14 @@ namespace Stream.Api.Stream.Reader
             this.writer = writer;
             this.clientSession = clientSession;
             configProcessor =
-                new TimeAndSizeWindowBatchProcessor<List<string>>(ProcessConfig, new CancellationTokenSource(), 100,
-                    1000);
+                new TimeAndSizeWindowBatchProcessor<List<string>>(ProcessConfig, new CancellationTokenSource(), 100000,
+                    10000);
             eventConfigProcessor =
-                new TimeAndSizeWindowBatchProcessor<string>(ProcessEventConfig, new CancellationTokenSource(), 100,
-                    1000);
+                new TimeAndSizeWindowBatchProcessor<string>(ProcessEventConfig, new CancellationTokenSource(), 100000,
+                    10000);
             periodicConfigProcessor =
                 new TimeAndSizeWindowBatchProcessor<Tuple<string, uint>>(ProcessPeriodicConfig,
-                    new CancellationTokenSource(), 100, 1000);
+                    new CancellationTokenSource(), 100000, 10000);
         }
 
         public event EventHandler ProcessComplete;

@@ -6,7 +6,7 @@ namespace Stream.Api.Stream.Reader
     internal class Config
     {
         public string dataSource;
-        public string dbPath;
+        public string sqlRaceConnectionString;
         public string ipAddress;
         public int outputFormat;
         public string rootPath;

@@ -57,7 +57,7 @@ namespace Stream.Api.Stream.Reader
         /// </summary>
         /// <param name="dataSource"></param>
         /// <returns>True if a live session is found. Otherwise, it's False.</returns>
-        public bool TryGetLiveSessions(string dataSource)
+        public bool TryGetLiveSessions()
         {
             var foundLiveSession = false;
             var currentSessionsResponse =
@@ -82,7 +82,7 @@ namespace Stream.Api.Stream.Reader
         /// </summary>
         /// <param name="dataSource"></param>
         /// <returns>True if session is found, False if there was an error in subscribing to the stream.</returns>
-        public async Task<bool> SubscribeToStartSessionNotification(string dataSource)
+        public async Task<bool> SubscribeToStartSessionNotification()
         {
             var startNotificationStream = sessionManagementServiceClient.GetSessionStartNotification(
                 new GetSessionStartNotificationRequest() { DataSource = dataSource }
@@ -116,11 +116,16 @@ namespace Stream.Api.Stream.Reader
         ///     recording by the Stream API.
         /// </summary>
         /// <param name="dataSource"></param>
-        public void SubscribeToStopNotification(string dataSource)
+        public void SubscribeToStopNotification()
         {
             var stopNotificationStream =
-                sessionManagementServiceClient.GetSessionStopNotification(new GetSessionStopNotificationRequest()
+                sessionManagementServiceClient?.GetSessionStopNotification(new GetSessionStopNotificationRequest()
                     { DataSource = dataSource }).ResponseStream;
+
+            if (stopNotificationStream == null)
+            {
+                return;
+            }
 
             var cancellationToken = cancellationTokenSourceEvents.Token;
             Task.Run(async () =>
@@ -130,6 +135,10 @@ namespace Stream.Api.Stream.Reader
                     while (!cancellationToken.IsCancellationRequested)
                     while (await stopNotificationStream.MoveNext(cancellationToken))
                     {
+                        if (stopNotificationStream.Current == null)
+                        {
+                            continue;
+                        }
                         var stopNotificationResponse = stopNotificationStream.Current;
                         streamSessionKeyToSession[stopNotificationResponse.SessionKey].EndSession();
                         Console.WriteLine($"Session Ended {stopNotificationResponse.SessionKey}.");
@@ -139,7 +148,7 @@ namespace Stream.Api.Stream.Reader
                 catch (Exception ex)
                 {
                     Console.WriteLine(
-                        $"Failed to stop session with session key {stopNotificationStream.Current.SessionKey}.");
+                        $"Failed to stop session with session key {stopNotificationStream.Current?.SessionKey}.");
                 }
             }, cancellationToken);
         }
@@ -170,7 +179,7 @@ namespace Stream.Api.Stream.Reader
                         new SqlDbSession(dataSource, sessionKey, bulkInsertHandler);
                 }
 
-                SubscribeToStopNotification(sessionResponse.DataSource);
+                SubscribeToStopNotification();
                 QuerySessionInfo(sessionKey);
             }
         }
