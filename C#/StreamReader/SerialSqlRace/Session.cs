@@ -123,8 +123,6 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                                 Console.WriteLine($"ESSENTIALS : New Packet {message.Packet.Type}");
                                 HandleNewPacket(message.Packet);
                             }
-
-                            ;
                         }
 
                         return;
@@ -227,7 +225,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     {
                         var samples = column.DoubleSamples.Samples.Select(x => x.Value).ToList();
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                samples, (long)packet.StartTime))
+                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
                         {
                             lastUpdated = DateTime.Now;
                             break;
@@ -241,7 +239,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     {
                         var samples = column.Int32Samples.Samples.Select(x => (double)x.Value).ToList();
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                samples, (long)packet.StartTime))
+                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
                         {
                             lastUpdated = DateTime.Now;
                             break;
@@ -256,7 +254,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     {
                         var samples = column.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0).ToList();
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                samples, (long)packet.StartTime))
+                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
                         {
                             lastUpdated = DateTime.Now;
                             break;
