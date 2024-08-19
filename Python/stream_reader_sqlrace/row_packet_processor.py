@@ -135,7 +135,8 @@ class RowPacketProcessor:
             assert len(parameter_identifiers) == len(all_data_array)
 
             for name, column in zip(parameter_identifiers, all_data_array):
-
+                if all(np.isnan(column)):
+                    continue
                 if not self.session_writer.add_data(
                         str(name),
                         column[~np.isnan(column)].tolist(),
