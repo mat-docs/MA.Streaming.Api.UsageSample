@@ -51,8 +51,7 @@ class PacketProcessor():
                 all_timestamps.append(timestamps_sqlrace)
                 all_data.append(data)
 
-        df = pd.DataFrame(all_data, columns=parameter_identifiers, index=all_timestamps, dtype=float)
-        shared_data[data_format_identifier] = df
+        shared_data[data_format_identifier] = (all_data, all_timestamps)
 
 
 class RowPacketProcessor:
@@ -91,9 +90,13 @@ class RowPacketProcessor:
         while not self.stop_event.is_set():
             time.sleep(self.process_interval)
             self.process_queues(True)
+            if len(self.packet_queues) != 0:
+                max_queue_length = max([queue.qsize() for key, queue in self.packet_queues.items()])
+                while max_queue_length > self.queue_threshold:
+                    self.process_queues()
+                    max_queue_length = max([queue.qsize() for key, queue in self.packet_queues.items()])
 
-
-    def process_queues(self, process_all=False):
+    def process_queues(self, use_all_processors=False):
         if self.processing_queues:
             return
         self.processing_queues = True
@@ -103,18 +106,19 @@ class RowPacketProcessor:
 
         sorted_queues = sorted(self.packet_queues.items(), key=lambda item: item[1].qsize(), reverse=True)
 
+        max_queue_length = 0
         for data_format_identifier, queue in sorted_queues:
-            if queue.qsize() >= self.queue_threshold or process_all:
+            max_queue_length = queue.qsize()
+            if len(processes) >= multiprocessing.cpu_count():
+                break
+            if queue.qsize() >= self.queue_threshold or use_all_processors:
                 parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
                 pp = PacketProcessor(data_format_identifier, parameter_identifiers, queue, shared_data)
                 p = Process(target=pp.start_process())
                 p.start()
                 processes.append(p)
 
-            if len(processes) >= multiprocessing.cpu_count():
-                break
-
-        logger.info("Processing %i row packet queue", len(processes))
+        logger.info("Processing %i row packet queue. Remaining max queue length %i", len(processes), max_queue_length)
 
         for p in processes:
             p.join()
@@ -125,18 +129,26 @@ class RowPacketProcessor:
             self.write_to_session(shared_data)
 
     def write_to_session(self, shared_data):
-        for data_format_identifier,df in shared_data.items():
+        for data_format_identifier, (all_data, all_timestamps) in shared_data.items():
             parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
-            for name, column in df.items():
-                column = column.dropna()
-                if column.size == 0:
-                    continue
-                if not self.session_writer.add_data(str(name), column.values.tolist(), column.index.tolist()):
+            all_data_array = np.array(all_data).transpose()
+            assert len(parameter_identifiers) == len(all_data_array)
+
+            for name, column in zip(parameter_identifiers, all_data_array):
+
+                if not self.session_writer.add_data(
+                        str(name),
+                        column[~np.isnan(column)].tolist(),
+                        np.array(all_timestamps)[~np.isnan(column)].tolist()
+                ):
                     logger.warning("Failed to add data for parameter %s", str(name))
 
-            logger.info("Added row data block of size %s", df.shape)
+            logger.debug("Added row data block of size %s", all_data_array.shape)
 
     def stop(self):
         self.stop_event.set()
         self.background_thread.join()
-        self.process_queues(process_all=True)
+        max_queue_length = max([queue.qsize() for key, queue in self.packet_queues.items()])
+        while max_queue_length > 0:
+            self.process_queues(True)
+            max_queue_length = max([queue.qsize() for key, queue in self.packet_queues.items()])
