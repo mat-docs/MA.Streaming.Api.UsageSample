@@ -14,6 +14,6 @@ The following options are available:
 | rootPath | "C:\\Temp\\" | The root path where all CSVs will be written to when output format is set to CSV. |
 | ipAddress | "localhost:13579" | The IP Address of the Stream API server. |
 | dataSource | "Default" | The data source name which is used to identify the data source the session comes from. This should match to what is set in the Stream API server. If you are using the bridge service, this is set as the ADS name. |
-| dbPath | "C:\\McLaren Applied\\StreamAPIDemo.ssndb" | The path of the ssndb file for recording to SQL Race |
+| sqlRaceConnectionString | "" | The connection string used by SQL Race to record to a SQL Race Server, SSN2, or SQLite. |
 | outputFormat | 1 | Sets the output format to record to. `1` = SQL Race, `2` = CSV, `3` = SQL Server DB |
 | sqlDbConnectionString | "" | The connection string used to connect to a SQL Server DB. |

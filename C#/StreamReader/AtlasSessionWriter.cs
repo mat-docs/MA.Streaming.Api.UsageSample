@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Net;
+using Google.Protobuf.Collections;
 using MA.Streaming.API;
 using MA.Streaming.OpenData;
 using MAT.OCS.Core;
@@ -44,7 +45,6 @@ namespace Stream.Api.Stream.Reader
 
         public AtlasSessionWriter(string connectionString)
         {
-            //connectionString = $"server=MCLA-F8ZLSQ3\\LOCAL;Initial Catalog=SQLRACE01_LOCAL;Trusted_Connection=True;";
             this.connectionString = connectionString;
         }
 
@@ -222,57 +222,6 @@ namespace Stream.Api.Stream.Reader
             catch (ConfigurationSetAlreadyExistsException)
             {
                 Console.WriteLine($"Config {configIdentifier} already exists.");
-            }
-        }
-
-        public void AddBasicConfiguration(IClientSession clientSession, string parameterIdentifier)
-        {
-            var configSetIdentifier = Guid.NewGuid().ToString();
-            var config = configSetManager.Create(connectionString, configSetIdentifier, "");
-            config.AddConversion(defaultConversion);
-            var parameterGroup = new ParameterGroup("Stream API");
-            config.AddParameterGroup(parameterGroup);
-            var applicationGroup =
-                new ApplicationGroup("Stream API", "Stream API", new List<string>() { "Stream API" });
-            applicationGroup.SupportsRda = false;
-            config.AddGroup(applicationGroup);
-            var channelId = clientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
-            channelIdParameterDictionary[parameterIdentifier] = channelId;
-            var parameterChannel = new Channel(channelId, parameterIdentifier, 0, DataType.Double64Bit,
-                ChannelDataSourceType.RowData, parameterIdentifier);
-            config.AddChannel(parameterChannel);
-            var parameter = new Parameter(
-                parameterIdentifier,
-                parameterIdentifier.Split(':')[0],
-                "",
-                0,
-                100,
-                0,
-                100,
-                0.0,
-                0xFFFF,
-                0,
-                "DefaultConversion",
-                new List<string>() { applicationGroup.Name },
-                new List<uint>() { channelId },
-                applicationGroup.Name
-            );
-            config.AddParameter(parameter);
-
-            Console.WriteLine($"Commiting config {config.Identifier}.");
-            try
-            {
-                lock (configLock)
-                {
-                    config.Commit();
-                }
-
-                clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
-                Console.WriteLine($"Successfully added configuration {configSetIdentifier}");
-            }
-            catch (ConfigurationSetAlreadyExistsException)
-            {
-                Console.WriteLine($"Config {configSetIdentifier} already exists.");
             }
         }
 
@@ -470,17 +419,16 @@ namespace Stream.Api.Stream.Reader
             }
         }
 
-        public bool TryAddData(IClientSession clientSession, string parameterIdentifier, double data,
+        public bool TryAddData(IClientSession clientSession, RepeatedField<string> parameterList, List<double> data,
             long timestamp)
         {
             try
             {
+                var channelIds = parameterList.Select(x => channelIdParameterDictionary[x]).ToList();
 
-                var channelId = channelIdParameterDictionary[parameterIdentifier];
+                var dataBytes = data.SelectMany(BitConverter.GetBytes).ToArray();
 
-                var dataBytes = BitConverter.GetBytes(data);
-
-                sampleCounter += 1;
+                sampleCounter += data.Count;
                 if (sampleCounter % 10000 == 0)
                 {
                     Console.WriteLine($"From Row Data Total Sample count: {sampleCounter}");
@@ -488,14 +436,15 @@ namespace Stream.Api.Stream.Reader
 
                 lock (configLock)
                 {
-                    clientSession.Session.AddRowData(timestamp, new List<uint>() { channelId }, dataBytes);
+                    clientSession.Session.AddRowData(timestamp, channelIds, dataBytes);
                 }
 
                 return true;
+
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to write row data {parameterIdentifier} due to {ex.Message}.");
+                Console.WriteLine($"Failed to write row data due to {ex.Message}.");
                 return false;
             }
         }

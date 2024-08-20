@@ -7,7 +7,6 @@ using Grpc.Core;
 using MA.Streaming.API;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Remote;
-using MAT.OCS.FFC.Configuration.Format.Protobuf;
 using MESL.SqlRace.Domain;
 
 namespace Stream.Api.Stream.Reader.SerialSqlRace
@@ -56,7 +55,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             // Wait for writing to session to end.
             do
             {
-            } while (DateTime.Now - lastUpdated < TimeSpan.FromSeconds(30));
+            } while (DateTime.Now - lastUpdated < TimeSpan.FromSeconds(120));
 
             sessionWriter.CloseSession(clientSession);
         }
@@ -343,41 +342,35 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                 {
                     case SampleRow.ListOneofCase.DoubleSamples:
                     {
-                        for (var j = 0; j < row.DoubleSamples.Samples.Count; j++)
+                        if (sessionWriter.TryAddData(clientSession, parameterList,
+                                row.DoubleSamples.Samples.Select(x => x.Value).ToList(), timestamp))
                         {
-                            lastUpdated = DateTime.Now;
-                            if (sessionWriter.TryAddData(clientSession, parameterList[j],
-                                    row.DoubleSamples.Samples[j].Value, timestamp)) continue;
-                            Console.WriteLine($"Failed to write data to parameter {parameterList[j]}");
-                            rowDataQueue.Enqueue(packet);
+                            continue;
                         }
-
+                        Console.WriteLine($"Failed to write data.");
+                        rowDataQueue.Enqueue(packet);
                         break;
                     }
                     case SampleRow.ListOneofCase.Int32Samples:
                     {
-                        for (var j = 0; j < row.Int32Samples.Samples.Count; j++)
+                        if (sessionWriter.TryAddData(clientSession, parameterList,
+                                row.Int32Samples.Samples.Select(x => (double)x.Value).ToList(), timestamp))
                         {
-                            lastUpdated = DateTime.Now;
-                            if (sessionWriter.TryAddData(clientSession, parameterList[j],
-                                    row.Int32Samples.Samples[j].Value, timestamp)) continue;
-                            Console.WriteLine($"Failed to write data to parameter {parameterList[j]}");
-                            rowDataQueue.Enqueue(packet);
+                            continue;
                         }
-
+                        Console.WriteLine($"Failed to write data.");
+                        rowDataQueue.Enqueue(packet);
                         break;
                     }
                     case SampleRow.ListOneofCase.BoolSamples:
                     {
-                        for (var j = 0; j < row.BoolSamples.Samples.Count; j++)
+                        if (sessionWriter.TryAddData(clientSession, parameterList,
+                                row.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0).ToList(), timestamp))
                         {
-                            lastUpdated = DateTime.Now;
-                            if (sessionWriter.TryAddData(clientSession, parameterList[j],
-                                    row.BoolSamples.Samples[j].Value ? 1.0 : 0.0, timestamp)) continue;
-                            Console.WriteLine($"Failed to write data to parameter {parameterList[j]}");
-                            rowDataQueue.Enqueue(packet);
+                            continue;
                         }
-
+                        Console.WriteLine($"Failed to write data.");
+                        rowDataQueue.Enqueue(packet);
                         break;
                     }
                     case SampleRow.ListOneofCase.StringSamples:
@@ -392,9 +385,8 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                         continue;
                     }
                 }
+                lastUpdated = DateTime.Now;
             }
-
-            return;
         }
 
         private void HandleMarkerPacket(MarkerPacket packet)
@@ -404,6 +396,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                 sessionWriter.AddLap(clientSession, timestamp, (short)packet.Value, packet.Label, true);
             else
                 sessionWriter.AddMarker(clientSession, timestamp, packet.Label);
+            lastUpdated = DateTime.Now;
         }
 
         private void HandleMetadataPacket(MetadataPacket packet)
@@ -427,7 +420,13 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             var timestamp = (long)packet.Timestamp % NumberOfNanosecondsInDay;
             var values = new List<double>();
             values.AddRange(packet.RawValues);
-            sessionWriter.TryAddEvent(clientSession, eventIdentifier, timestamp, values);
+            lastUpdated = DateTime.Now;
+            if (sessionWriter.TryAddEvent(clientSession, eventIdentifier, timestamp, values))
+            {
+                return;
+            }
+            eventPacketQueue.Enqueue(packet);
+            Console.WriteLine($"Failed to write event {eventIdentifier}.");
         }
 
         private RepeatedField<string> GetParameterList(ulong dataFormatId)
