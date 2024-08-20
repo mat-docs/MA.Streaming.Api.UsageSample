@@ -337,6 +337,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             {
                 var row = packet.Rows[i];
                 var timestamp = (long)packet.Timestamps[i] % NumberOfNanosecondsInDay;
+                lastUpdated = DateTime.Now;
 
                 switch (row.ListCase)
                 {
@@ -385,7 +386,6 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                         continue;
                     }
                 }
-                lastUpdated = DateTime.Now;
             }
         }
 
