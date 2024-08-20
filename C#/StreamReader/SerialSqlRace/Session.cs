@@ -245,6 +245,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             {
                 var parameterIdentifier = parameterList[i];
                 var column = packet.Columns[i];
+                lastUpdated = DateTime.Now;
                 switch (column.ListCase)
                 {
                     case SampleColumn.ListOneofCase.DoubleSamples:
@@ -253,7 +254,6 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
                                 samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
                         {
-                            lastUpdated = DateTime.Now;
                             break;
                         }
 
@@ -267,7 +267,6 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
                                 samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
                         {
-                            lastUpdated = DateTime.Now;
                             break;
                         }
 
@@ -282,7 +281,6 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
                                 samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
                         {
-                            lastUpdated = DateTime.Now;
                             break;
                         }
 
