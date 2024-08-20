@@ -2,19 +2,16 @@ import logging
 import multiprocessing
 from multiprocessing import Process, Queue, Manager
 from typing import List, Dict
-import pandas as pd
 import numpy as np
 import threading
 import time
 
-from ma.streaming.api.v1 import api_pb2
 from ma.streaming.open_data.v1 import open_data_pb2
-from stream_api import StreamApi
 
 logger = logging.getLogger(__name__)
 
 
-class PacketProcessor():
+class PacketProcessor:
     def __init__(self, data_format_identifier, parameter_identifiers, queue, shared_data):
         self.data_format_identifier = data_format_identifier
         self.parameter_identifiers = parameter_identifiers
@@ -57,7 +54,8 @@ class PacketProcessor():
 class RowPacketProcessor:
 
     def __init__(self, session_writer, data_format_cache):
-        self.packet_queues: Dict[int, Queue] = dict()
+        self.manager = Manager()
+        self.packet_queues: Dict[int, Queue] = self.manager.dict()
         self.session_writer = session_writer
         self.data_format_cache = data_format_cache
         self.queue_threshold = 50
@@ -66,8 +64,15 @@ class RowPacketProcessor:
 
         # Start the background thread
         self.stop_event = threading.Event()
-        self.background_thread = threading.Thread(target=self.schedule_process_queue)
+        self.background_thread = threading.Thread(target=self.schedule_process_queue,name="process_row_thread")
         self.background_thread.start()
+
+    @property
+    def max_queue_length(self):
+        if len(self.packet_queues) > 0:
+            return max([queue.qsize() for key, queue in self.packet_queues.items()])
+        else:
+            return 0
 
     def add_packet_to_queue(self, packet: open_data_pb2.RowDataPacket):
         if packet.data_format.data_format_identifier == 0:
@@ -77,7 +82,8 @@ class RowPacketProcessor:
             data_format_identifier = packet.data_format.data_format_identifier
 
         if data_format_identifier not in self.packet_queues:
-            self.packet_queues[data_format_identifier] = Queue()
+            q = self.manager.Queue()
+            self.packet_queues[data_format_identifier] = q
 
         self.packet_queues[data_format_identifier].put(packet)
         if self.packet_queues[data_format_identifier].qsize() > self.queue_threshold:
@@ -88,10 +94,8 @@ class RowPacketProcessor:
             time.sleep(self.process_interval)
             self.process_queues(True)
             if len(self.packet_queues) != 0:
-                max_queue_length = max([queue.qsize() for key, queue in self.packet_queues.items()])
-                while max_queue_length > self.queue_threshold:
+                while self.max_queue_length > self.queue_threshold:
                     self.process_queues()
-                    max_queue_length = max([queue.qsize() for key, queue in self.packet_queues.items()])
 
     def process_queues(self, use_all_processors=False):
         if self.processing_queues:
@@ -103,11 +107,9 @@ class RowPacketProcessor:
 
         sorted_queues = sorted(self.packet_queues.items(), key=lambda item: item[1].qsize(), reverse=True)
 
-        max_queue_length = 0
         in_process_count = 0
         start_time = time.time()
         for data_format_identifier, queue in sorted_queues:
-            max_queue_length = queue.qsize()
             if time.time() - start_time > self.process_interval * 0.8:
                 logger.info("Terminating early due to timeout.")
                 break
@@ -125,7 +127,7 @@ class RowPacketProcessor:
                     logger.debug("Process row packet in process with queue size %i.", queue.qsize())
                     in_process_count += 1
 
-        logger.info("Processing %i out of %i row packet queues. Remaining max queue length %i", len(processes)+in_process_count, len(sorted_queues), max_queue_length)
+        logger.info("Processing %i out of %i row packet queues. Remaining max queue length %i", len(processes)+in_process_count, len(sorted_queues), self.max_queue_length)
 
         for p in processes:
             p.join()
@@ -156,7 +158,5 @@ class RowPacketProcessor:
     def stop(self):
         self.stop_event.set()
         self.background_thread.join()
-        max_queue_length = max([queue.qsize() for key, queue in self.packet_queues.items()])
-        while max_queue_length > 0:
+        while self.max_queue_length > 0:
             self.process_queues(True)
-            max_queue_length = max([queue.qsize() for key, queue in self.packet_queues.items()])
