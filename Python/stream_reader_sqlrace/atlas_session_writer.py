@@ -296,9 +296,9 @@ class AtlasSessionWriter:
         # if there are no app group for parameter identifier
         if len(parameter_identifier.split(":")) == 1:
             parameter_identifier = parameter_identifier + ":StreamAPI"
-        try:
+        if parameter_identifier in self.parameter_channel_id_mapping:
             channel_id = self.parameter_channel_id_mapping[parameter_identifier]
-        except KeyError:
+        else:
             logger.warning(
                 "No config processed for parameter %s, data not added",
                 parameter_identifier,
