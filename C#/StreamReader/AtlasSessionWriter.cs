@@ -30,10 +30,11 @@ namespace Stream.Api.Stream.Reader
             };
 
         public ConcurrentDictionary<string, uint> channelIdParameterDictionary = new();
-        public ConcurrentDictionary<string, uint> channelIdPeriodicParameterDictionary = new();
+        public ConcurrentDictionary<string, Dictionary<uint, uint>> channelIdPeriodicParameterDictionary = new();
 
         private readonly object configLock = new();
         private ConfigurationSetManager configSetManager;
+        private uint currentChannelId = 0;
 
         private readonly RationalConversion defaultConversion =
             RationalConversion.CreateSimple1To1Conversion("DefaultConversion", "", "%5.2f");
@@ -90,7 +91,7 @@ namespace Stream.Api.Stream.Reader
             var recorderConfiguration = RecordersConfiguration.GetRecordersConfiguration();
             recorderConfiguration.AddConfiguration(
                 Guid.NewGuid(),
-                "SQLite",
+                "SQLServer",
                 connectionString,
                 connectionString,
                 connectionString,
@@ -98,131 +99,148 @@ namespace Stream.Api.Stream.Reader
             );
         }
 
-        public void AddConfiguration(IClientSession clientSession, ConfigurationPacket packet)
+        //public void AddConfiguration(IClientSession clientSession, ConfigurationPacket packet)
+        //{
+        //    Console.WriteLine($"Adding configuration {packet.ConfigId}.");
+        //    var configIdentifier = packet.ConfigId;
+
+        //    if (configSetManager.Exists(new DatabaseConnectionInformation(connectionString), configIdentifier))
+        //    {
+        //        Console.WriteLine($"Configuration {packet.ConfigId} already exists, using existing config.");
+        //        clientSession.Session.UseLoggingConfigurationSet(configIdentifier);
+        //        return;
+        //    }
+
+        //    var config = configSetManager.Create(connectionString, configIdentifier, "");
+        //    var defaultConversionFuncName = defaultConversion.Name;
+        //    config.AddConversion(defaultConversion);
+        //    var apps = packet.ParameterDefinitions.Select(x => x.ApplicationName).ToList();
+
+        //    var appGroups = apps.Select(x =>
+        //        new ApplicationGroup(x, CreateParameterGroups(packet.GroupDefinitions, config, x)))
+        //        .ToList();
+
+        //    config.AddGroups(appGroups);
+        //    var channelIdsToAdd = new Dictionary<string, uint>();
+        //    var periodicChannelIdsToAdd = new Dictionary<string, Dictionary<uint, uint>>();
+
+        //    foreach (var parameterDefinition in packet.ParameterDefinitions)
+        //    {
+        //        var conversionFuncName = defaultConversionFuncName;
+        //        var channelId = GenerateUniqueChannelId();
+        //        channelIdsToAdd[parameterDefinition.Identifier] = channelId;
+        //        var parameterChannel = new Channel(channelId, parameterDefinition.Name, 0, DataType.Double64Bit,
+        //            ChannelDataSourceType.RowData, parameterDefinition.Name);
+        //        config.AddChannel(parameterChannel);
+        //        if (parameterDefinition.Conversion != null)
+        //        {
+        //            var inputValues = new double[parameterDefinition.Conversion.InputValues.Count];
+        //            var stringValues = new string[parameterDefinition.Conversion.StringValues.Count];
+        //            parameterDefinition.Conversion.InputValues.CopyTo(inputValues, 0);
+        //            parameterDefinition.Conversion.StringValues.CopyTo(stringValues, 0);
+        //            config.AddConversion(new TextConversion(
+        //                parameterDefinition.Conversion.ConversionIdentifier,
+        //                parameterDefinition.Units,
+        //                parameterDefinition.FormatString,
+        //                inputValues,
+        //                stringValues,
+        //                parameterDefinition.Conversion.Default
+        //            ));
+        //            conversionFuncName = parameterDefinition.Conversion.ConversionIdentifier;
+        //        }
+
+        //        var parameter = new Parameter(
+        //            parameterDefinition.Identifier,
+        //            parameterDefinition.Name,
+        //            parameterDefinition.Description,
+        //            parameterDefinition.MaxValue,
+        //            parameterDefinition.MinValue,
+        //            parameterDefinition.WarningMaxValue,
+        //            parameterDefinition.WarningMinValue,
+        //            0.0,
+        //            0xFFFF,
+        //            0,
+        //            conversionFuncName,
+        //            new List<string> { parameterDefinition.ApplicationName },
+        //            new List<uint> { channelId },
+        //            parameterDefinition.ApplicationName,
+        //            parameterDefinition.FormatString,
+        //            parameterDefinition.Units
+        //        );
+        //        config.AddParameter(parameter);
+        //    }
+
+        //    foreach (var eventDefinition in packet.EventDefinitions)
+        //    {
+        //        var conversionFuncNames = new string[]
+        //            { defaultConversionFuncName, defaultConversionFuncName, defaultConversionFuncName };
+        //        for (var i = 0; i < eventDefinition.Conversions.Count; i++)
+        //            if (eventDefinition.Conversions[i].ConversionIdentifier != "")
+        //            {
+        //                var inputValues = new double[eventDefinition.Conversions[i].InputValues.Count];
+        //                var stringValues = new string[eventDefinition.Conversions[i].StringValues.Count];
+        //                eventDefinition.Conversions[i].InputValues.CopyTo(inputValues, 0);
+        //                eventDefinition.Conversions[i].StringValues.CopyTo(stringValues, 0);
+        //                config.AddConversion(new TextConversion(
+        //                    eventDefinition.Conversions[i].ConversionIdentifier,
+        //                    "",
+        //                    "5.2f",
+        //                    inputValues,
+        //                    stringValues,
+        //                    eventDefinition.Conversions[i].Default
+        //                ));
+        //                conversionFuncNames[i] = eventDefinition.Conversions[i].ConversionIdentifier;
+        //            }
+
+        //        var eventDefId = (int)eventDefinition.DefinitionId;
+        //        var eventDefinitionSql = new EventDefinition(
+        //            eventDefId,
+        //            eventDefinition.Description,
+        //            eventPriorityDictionary[eventDefinition.Priority],
+        //            conversionFuncNames,
+        //            eventDefinition.ApplicationName
+        //        );
+        //        config.AddEventDefinition(eventDefinitionSql);
+        //    }
+
+        //    Console.WriteLine($"Commiting config {configIdentifier}.");
+        //    try
+        //    {
+        //        lock (configLock)
+        //        {
+        //            config.Commit();
+        //            clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
+        //        }
+
+        //        Console.WriteLine($"Successfully added configuration {configIdentifier}");
+        //    }
+        //    catch (ConfigurationSetAlreadyExistsException)
+        //    {
+        //        Console.WriteLine($"Config {configIdentifier} already exists.");
+        //    }
+        //}
+
+        private List<string> CreateParameterGroups(IEnumerable<GroupDefinition> groupDefinitions, ConfigurationSet config, string appName)
         {
-            Console.WriteLine($"Adding configuration {packet.ConfigId}.");
-            var configIdentifier = packet.ConfigId;
-            var configSetManager = new ConfigurationSetManager();
+            var groups = groupDefinitions
+                .Select(x => x)
+                .Where(x => x.Equals(appName))
+                .ToList();
 
-            if (configSetManager.Exists(new DatabaseConnectionInformation(connectionString), configIdentifier))
+            var parameterGroups = new List<ParameterGroup>();
+
+            foreach (var group in groups)
             {
-                Console.WriteLine($"Configuration {packet.ConfigId} already exists, using existing config.");
-                clientSession.Session.UseLoggingConfigurationSet(configIdentifier);
-                return;
-            }
-
-            var config = configSetManager.Create(connectionString, configIdentifier, "");
-            var defaultConversionFuncName = "DefaultConversion";
-            config.AddConversion(
-                RationalConversion.CreateSimple1To1Conversion(defaultConversionFuncName, "", "%5.2f")
-            );
-            var appGroups = new List<string>();
-            foreach (var parameterDefinition in packet.ParameterDefinitions)
-                appGroups.Add(parameterDefinition.ApplicationName);
-
-            foreach (var app in appGroups)
-            {
-                var group = new ParameterGroup(app, app);
-                config.AddParameterGroup(group);
-                var applicationGroup = new ApplicationGroup(app, new List<string>() { group.Identifier });
-                applicationGroup.SupportsRda = false;
-                config.AddGroup(applicationGroup);
-            }
-
-            foreach (var parameterDefinition in packet.ParameterDefinitions)
-            {
-                var conversionFuncName = defaultConversionFuncName;
-                var channelId = clientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
-                channelIdParameterDictionary[parameterDefinition.Identifier] = channelId;
-                var parameterChannel = new Channel(channelId, parameterDefinition.Name, 0, DataType.Double64Bit,
-                    ChannelDataSourceType.RowData, parameterDefinition.Name);
-                config.AddChannel(parameterChannel);
-                if (parameterDefinition.Conversion != null)
+                var subGroups = new List<string>();
+                if (group.Groups.Any())
                 {
-                    var inputValues = new double[parameterDefinition.Conversion.InputValues.Count];
-                    var stringValues = new string[parameterDefinition.Conversion.StringValues.Count];
-                    parameterDefinition.Conversion.InputValues.CopyTo(inputValues, 0);
-                    parameterDefinition.Conversion.StringValues.CopyTo(stringValues, 0);
-                    config.AddConversion(new TextConversion(
-                        parameterDefinition.Conversion.ConversionIdentifier,
-                        parameterDefinition.Units,
-                        parameterDefinition.FormatString,
-                        inputValues,
-                        stringValues,
-                        parameterDefinition.Conversion.Default
-                    ));
-                    conversionFuncName = parameterDefinition.Conversion.ConversionIdentifier;
+                    subGroups = CreateParameterGroups(group.Groups, config, appName);
                 }
-
-                var parameter = new Parameter(
-                    parameterDefinition.Identifier,
-                    parameterDefinition.Name,
-                    parameterDefinition.Description,
-                    parameterDefinition.MaxValue,
-                    parameterDefinition.MinValue,
-                    parameterDefinition.WarningMaxValue,
-                    parameterDefinition.WarningMinValue,
-                    0.0,
-                    0xFFFF,
-                    0,
-                    conversionFuncName,
-                    new List<string> { parameterDefinition.ApplicationName },
-                    new List<uint> { channelId },
-                    parameterDefinition.ApplicationName,
-                    parameterDefinition.FormatString,
-                    parameterDefinition.Units
-                );
-                config.AddParameter(parameter);
+                parameterGroups.Add(new ParameterGroup(group.Identifier, group.Description, subGroups));
             }
+            config.AddParameterGroups(parameterGroups);
 
-            foreach (var eventDefinition in packet.EventDefinitions)
-            {
-                var conversionFuncNames = new string[]
-                    { defaultConversionFuncName, defaultConversionFuncName, defaultConversionFuncName };
-                for (var i = 0; i < eventDefinition.Conversions.Count; i++)
-                    if (eventDefinition.Conversions[i].ConversionIdentifier != "")
-                    {
-                        var inputValues = new double[eventDefinition.Conversions[i].InputValues.Count];
-                        var stringValues = new string[eventDefinition.Conversions[i].StringValues.Count];
-                        eventDefinition.Conversions[i].InputValues.CopyTo(inputValues, 0);
-                        eventDefinition.Conversions[i].StringValues.CopyTo(stringValues, 0);
-                        config.AddConversion(new TextConversion(
-                            eventDefinition.Conversions[i].ConversionIdentifier,
-                            "",
-                            "5.2f",
-                            inputValues,
-                            stringValues,
-                            eventDefinition.Conversions[i].Default
-                        ));
-                        conversionFuncNames[i] = eventDefinition.Conversions[i].ConversionIdentifier;
-                    }
-
-                var eventDefId = (int)eventDefinition.DefinitionId;
-                var eventDefinitionSql = new EventDefinition(
-                    eventDefId,
-                    eventDefinition.Description,
-                    eventPriorityDictionary[eventDefinition.Priority],
-                    conversionFuncNames,
-                    eventDefinition.ApplicationName
-                );
-                config.AddEventDefinition(eventDefinitionSql);
-            }
-
-            Console.WriteLine($"Commiting config {configIdentifier}.");
-            try
-            {
-                lock (configLock)
-                {
-                    config.Commit();
-                    clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
-                }
-
-                Console.WriteLine($"Successfully added configuration {configIdentifier}");
-            }
-            catch (ConfigurationSetAlreadyExistsException)
-            {
-                Console.WriteLine($"Config {configIdentifier} already exists.");
-            }
+            return parameterGroups.Select(x => x.Identifier).ToList();
         }
 
         public void AddBasicPeriodicParameterConfiguration(IClientSession clientSession,
@@ -237,11 +255,11 @@ namespace Stream.Api.Stream.Reader
                 new ApplicationGroup("Stream API", "Stream API", new List<string>() { "Stream API" });
             applicationGroup.SupportsRda = false;
             config.AddGroup(applicationGroup);
-            var channelsToAdd = new Dictionary<string, uint>();
+            var channelsToAdd = new Dictionary<string, Tuple<uint, uint>>();
             foreach (var parameter in parameterIdentifiers)
             {
-                var channelId = clientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
-                channelsToAdd[parameter.Item1] = channelId;
+                var channelId = GenerateUniqueChannelId();
+                channelsToAdd[parameter.Item1] = new Tuple<uint, uint>(parameter.Item2, channelId);
                 var parameterChannel = new Channel(channelId, parameter.Item1, parameter.Item2, DataType.Double64Bit,
                     ChannelDataSourceType.Periodic, parameter.Item1);
                 config.AddChannel(parameterChannel);
@@ -275,8 +293,20 @@ namespace Stream.Api.Stream.Reader
                 clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
                 Console.WriteLine(
                     $"Successfully added configuration {configSetIdentifier} for {parameterIdentifiers.Count} parameters.");
+
                 foreach (var parameter in channelsToAdd)
-                    channelIdPeriodicParameterDictionary[parameter.Key] = parameter.Value;
+                {
+                    if (channelIdPeriodicParameterDictionary.ContainsKey(parameter.Key))
+                    {
+                        channelIdPeriodicParameterDictionary[parameter.Key].Add(parameter.Value.Item1, parameter.Value.Item2);
+                    }
+                    else
+                    {
+                        channelIdPeriodicParameterDictionary[parameter.Key] = new Dictionary<uint, uint>
+                            { { parameter.Value.Item1, parameter.Value.Item2 } };
+                    }
+                }
+                     
             }
             catch (ConfigurationSetAlreadyExistsException)
             {
@@ -299,7 +329,7 @@ namespace Stream.Api.Stream.Reader
             var channelsToAdd = new Dictionary<string, uint>();
             foreach (var parameterIdentifier in parameterIdentifiers)
             {
-                var channelId = clientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
+                var channelId = GenerateUniqueChannelId();
                 channelsToAdd[parameterIdentifier] = channelId;
                 var parameterChannel = new Channel(channelId, parameterIdentifier, 0, DataType.Double64Bit,
                     ChannelDataSourceType.RowData, parameterIdentifier);
@@ -393,8 +423,30 @@ namespace Stream.Api.Stream.Reader
             }
         }
 
+        private readonly object _channelLock = new();
+
+        private uint GenerateUniqueChannelId()
+        {
+            lock (_channelLock)
+            {
+                var channelId = currentChannelId % 2147483647;
+                currentChannelId++;
+                return channelId;
+            }
+        }
+
+        public bool IsParameterExistInConfig(string parameterName)
+        {
+            return channelIdParameterDictionary.ContainsKey( parameterName );
+        }
+
+        public bool IsParameterExistInConfig(string parameterName, uint interval)
+        {
+            return channelIdPeriodicParameterDictionary.ContainsKey(parameterName) && channelIdPeriodicParameterDictionary[parameterName].ContainsKey(interval);
+        }
+
         public bool TryAddPeriodicData(IClientSession clientSession, string parameterIdentifier, List<double> data,
-            long timestamp)
+            long timestamp, uint interval)
         {
             try
             {
@@ -406,7 +458,7 @@ namespace Stream.Api.Stream.Reader
                 }
                 lock (configLock)
                 {
-                    clientSession.Session.AddChannelData(channelIdPeriodicParameterDictionary[parameterIdentifier],
+                    clientSession.Session.AddChannelData(channelIdPeriodicParameterDictionary[parameterIdentifier][interval],
                         timestamp, data.Count, dataBytes);
                 }
 

@@ -55,6 +55,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             // Wait for writing to session to end.
             do
             {
+                Task.Delay(1000).Wait();
             } while (DateTime.Now - lastUpdated < TimeSpan.FromSeconds(120));
 
             sessionWriter.CloseSession(clientSession);
@@ -161,12 +162,12 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             {
                 switch (packetType)
                 {
-                    case "Configuration":
-                    {
-                        var packetConfig = ConfigurationPacket.Parser.ParseFrom(content);
-                        sessionWriter.AddConfiguration(clientSession, packetConfig);
-                        break;
-                    }
+                    //case "Configuration":
+                    //{
+                    //    var packetConfig = ConfigurationPacket.Parser.ParseFrom(content);
+                    //    sessionWriter.AddConfiguration(clientSession, packetConfig);
+                    //    break;
+                    //}
                     case "PeriodicData":
                     {
                         var periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
@@ -230,7 +231,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             }
 
             var newParameters = parameterList
-                .Where(x => !sessionWriter.channelIdPeriodicParameterDictionary.ContainsKey(x)).ToList();
+                .Where(x => !sessionWriter.IsParameterExistInConfig(x, packet.Interval)).ToList();
             if (newParameters.Any())
             {
                 // If the packet contains new parameters, put it in the list parameters to add to config and queue the packet to process later.
@@ -252,7 +253,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     {
                         var samples = column.DoubleSamples.Samples.Select(x => x.Value).ToList();
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
+                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay, packet.Interval))
                         {
                             break;
                         }
@@ -265,7 +266,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     {
                         var samples = column.Int32Samples.Samples.Select(x => (double)x.Value).ToList();
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
+                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay, packet.Interval))
                         {
                             break;
                         }
@@ -279,7 +280,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     {
                         var samples = column.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0).ToList();
                         if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay))
+                                samples, (long)packet.StartTime % NumberOfNanosecondsInDay, packet.Interval))
                         {
                             break;
                         }
@@ -318,7 +319,6 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                 Console.WriteLine($"Parameter List Exception {ex}");
                 parameterList = new RepeatedField<string>();
             }
-            
 
             var newParameters = parameterList.Where(x => !sessionWriter.channelIdParameterDictionary.ContainsKey(x))
                 .ToList();

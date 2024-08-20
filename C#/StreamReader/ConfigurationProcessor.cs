@@ -47,8 +47,8 @@ namespace Stream.Api.Stream.Reader
 
         public void AddPeriodicPacketParameter(Tuple<string, uint> parameter)
         {
-            if (eventsAndParametersProcessed.Contains(parameter.Item1 + "Periodic")) return;
-            eventsAndParametersProcessed.Add(parameter.Item1 + "Periodic");
+            if (eventsAndParametersProcessed.Contains(parameter.Item1 + "Periodic" + parameter.Item2)) return;
+            eventsAndParametersProcessed.Add(parameter.Item1 + "Periodic" + parameter.Item2);
             periodicConfigProcessor.Add(parameter);
         }
 
