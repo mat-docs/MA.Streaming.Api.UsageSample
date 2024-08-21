@@ -83,9 +83,6 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Failed to read stream due to {ex}");
-                }
-                finally
-                {
                     ReadPackets(cancellationToken, connectionDetails);
                 }
             }, cancellationToken);
