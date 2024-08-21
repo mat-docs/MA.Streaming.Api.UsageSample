@@ -1,8 +1,10 @@
 ﻿// <copyright file="StreamApiClient.cs" company="McLaren Applied Ltd.">
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
+using System.Data.SQLite;
 using MA.Streaming.API;
 using MA.Streaming.Proto.Client.Remote;
+using Newtonsoft.Json.Bson;
 using Stream.Api.Stream.Reader.SerialSqlRace;
 using Stream.Api.Stream.Reader.SqlServerDb;
 using Stream.Api.Stream.Reader.TextSessions;
@@ -22,10 +24,10 @@ namespace Stream.Api.Stream.Reader
 
         private readonly BulkInsertHandler bulkInsertHandler;
         private ConnectionManagerService.ConnectionManagerServiceClient? connectionManagerServiceClient;
-        private readonly string dataSource;
-        private readonly int outputFormat;
-        private string previousSessionKey;
-        private readonly string rootFolderPath;
+        private readonly string? dataSource;
+        private readonly int? outputFormat;
+        private List<Connection> streamApiConnections = new();
+        private readonly string? rootFolderPath;
         private SessionManagementService.SessionManagementServiceClient? sessionManagementServiceClient;
         private readonly Dictionary<string, DateTime> streams = new();
         private readonly Dictionary<string, ISession> streamSessionKeyToSession = new();
@@ -221,6 +223,7 @@ namespace Stream.Api.Stream.Reader
                         { Details = connectionDetails });
                     var cancellationToken = cancellationTokenSourceSession.Token;
                     streamSessionKeyToSession[sessionKey].ReadPackets(cancellationToken, connectionResponse.Connection);
+                    this.streamApiConnections.Add(connectionResponse.Connection);
                 });
             return sessionResponse.IsComplete;
         }
@@ -234,6 +237,14 @@ namespace Stream.Api.Stream.Reader
                 finished = UpdateDataStreams(sessionKey);
                 Thread.Sleep(1000);
             } while (!cancellationToken.IsCancellationRequested && !finished);
+        }
+
+        public void CloseConnections()
+        {
+            this.streamApiConnections.ForEach(x =>
+            { 
+                connectionManagerServiceClient?.CloseConnection(new CloseConnectionRequest() { Connection = x });
+            });
         }
     }
 }

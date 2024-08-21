@@ -9,73 +9,73 @@ namespace Stream.Api.Stream.Reader
 {
     internal class ConfigurationProcessor
     {
-        private readonly IClientSession clientSession;
-        private readonly TimeAndSizeWindowBatchProcessor<List<string>> configProcessor;
-        private readonly TimeAndSizeWindowBatchProcessor<string> eventConfigProcessor;
-        private readonly ConcurrentBag<string> eventsAndParametersProcessed = new();
-        private readonly TimeAndSizeWindowBatchProcessor<Tuple<string, uint>> periodicConfigProcessor;
-        private readonly AtlasSessionWriter writer;
+        private readonly IClientSession _clientSession;
+        private readonly TimeAndSizeWindowBatchProcessor<List<string>> _rowConfigProcessor;
+        private readonly TimeAndSizeWindowBatchProcessor<string> _eventConfigProcessor;
+        private readonly ConcurrentBag<string> _eventsAndParametersProcessed = new();
+        private readonly TimeAndSizeWindowBatchProcessor<Tuple<string, uint>> _periodicConfigProcessor;
+        private readonly AtlasSessionWriter _writer;
 
         public ConfigurationProcessor(AtlasSessionWriter writer, IClientSession clientSession)
         {
-            this.writer = writer;
-            this.clientSession = clientSession;
-            configProcessor =
-                new TimeAndSizeWindowBatchProcessor<List<string>>(ProcessConfig, new CancellationTokenSource(), 100000,
+            this._writer = writer;
+            this._clientSession = clientSession;
+            _rowConfigProcessor =
+                new TimeAndSizeWindowBatchProcessor<List<string>>(ProcessRowConfig, new CancellationTokenSource(), 100000,
                     10000);
-            eventConfigProcessor =
+            _eventConfigProcessor =
                 new TimeAndSizeWindowBatchProcessor<string>(ProcessEventConfig, new CancellationTokenSource(), 100000,
                     10000);
-            periodicConfigProcessor =
+            _periodicConfigProcessor =
                 new TimeAndSizeWindowBatchProcessor<Tuple<string, uint>>(ProcessPeriodicConfig,
                     new CancellationTokenSource(), 100000, 10000);
         }
 
-        public event EventHandler ProcessComplete;
-        public event EventHandler ProcessEventComplete;
-        public event EventHandler ProcessPeriodicComplete;
+        public event EventHandler? ProcessRowComplete;
+        public event EventHandler? ProcessEventComplete;
+        public event EventHandler? ProcessPeriodicComplete;
 
-        public void AddPacketParameter(List<string> parameters)
+        public void AddRowPacketParameter(List<string> parameters)
         {
-            var newParameters = parameters.Where(x => !eventsAndParametersProcessed.Contains(x)).ToList();
+            var newParameters = parameters.Where(x => !_eventsAndParametersProcessed.Contains(x)).ToList();
             if (!newParameters.Any()) return;
 
-            foreach (var parameter in newParameters) eventsAndParametersProcessed.Add(parameter);
+            foreach (var parameter in newParameters) _eventsAndParametersProcessed.Add(parameter);
             ;
-            configProcessor.Add(newParameters);
+            _rowConfigProcessor.Add(newParameters);
         }
 
         public void AddPeriodicPacketParameter(Tuple<string, uint> parameter)
         {
-            if (eventsAndParametersProcessed.Contains(parameter.Item1 + "Periodic" + parameter.Item2)) return;
-            eventsAndParametersProcessed.Add(parameter.Item1 + "Periodic" + parameter.Item2);
-            periodicConfigProcessor.Add(parameter);
+            if (_eventsAndParametersProcessed.Contains(parameter.Item1 + "Periodic" + parameter.Item2)) return;
+            _eventsAndParametersProcessed.Add(parameter.Item1 + "Periodic" + parameter.Item2);
+            _periodicConfigProcessor.Add(parameter);
         }
 
         public void AddPacketEvent(string eventIdentifier)
         {
-            if (eventsAndParametersProcessed.Contains(eventIdentifier)) return;
-            eventsAndParametersProcessed.Add(eventIdentifier);
-            eventConfigProcessor.Add(eventIdentifier);
+            if (_eventsAndParametersProcessed.Contains(eventIdentifier)) return;
+            _eventsAndParametersProcessed.Add(eventIdentifier);
+            _eventConfigProcessor.Add(eventIdentifier);
         }
 
         private Task ProcessPeriodicConfig(IReadOnlyList<Tuple<string, uint>> parameters)
         {
-            writer.AddBasicPeriodicParameterConfiguration(clientSession, parameters);
+            _writer.AddBasicPeriodicParameterConfiguration(_clientSession, parameters);
             ProcessPeriodicComplete?.Invoke(this, null);
             return Task.CompletedTask;
         }
 
-        private Task ProcessConfig(IReadOnlyList<List<string>> parameters)
+        private Task ProcessRowConfig(IReadOnlyList<List<string>> parameters)
         {
-            writer.AddBasicParameterConfiguration(clientSession, parameters.SelectMany(i => i).ToList());
-            ProcessComplete?.Invoke(this, null);
+            _writer.AddBasicRowParameterConfiguration(_clientSession, parameters.SelectMany(i => i).ToList());
+            ProcessRowComplete?.Invoke(this, null);
             return Task.CompletedTask;
         }
 
         private Task ProcessEventConfig(IReadOnlyList<string> eventIdentifiers)
         {
-            writer.AddBasicEventConfiguration(clientSession, eventIdentifiers);
+            _writer.AddBasicEventConfiguration(_clientSession, eventIdentifiers);
             ProcessEventComplete?.Invoke(this, null);
             return Task.CompletedTask;
         }

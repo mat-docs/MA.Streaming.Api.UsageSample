@@ -15,40 +15,39 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
     {
         // 10^9 * 3600 * 24 = 86400000000000
         private const long NumberOfNanosecondsInDay = 86400000000000;
-        private readonly IClientSession clientSession;
-        private readonly DataFormatManagerService.DataFormatManagerServiceClient dataFormatManagerServiceClient;
-        private readonly string dataSource;
-        private readonly PacketReaderService.PacketReaderServiceClient packetReaderServiceClient;
-        private readonly AtlasSessionWriter sessionWriter;
-        private readonly ConfigurationProcessor configProcessor;
-        private readonly ConcurrentDictionary<ulong, string> eventIdentifierDataFormatCache = new();
-        private readonly ConcurrentQueue<EventPacket> eventPacketQueue = new();
+        private readonly IClientSession _clientSession;
+        private readonly DataFormatManagerService.DataFormatManagerServiceClient _dataFormatManagerServiceClient;
+        private readonly string _dataSource;
+        private readonly PacketReaderService.PacketReaderServiceClient _packetReaderServiceClient;
+        private readonly AtlasSessionWriter _sessionWriter;
+        private readonly ConfigurationProcessor _configProcessor;
+        private readonly ConcurrentDictionary<ulong, string> _eventIdentifierDataFormatCache = new();
+        private readonly ConcurrentQueue<EventPacket> _eventPacketQueue = new();
 
-        private DateTime lastUpdated;
-        private readonly ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();
-        private readonly ConcurrentQueue<PeriodicDataPacket> periodicDataQueue = new();
-        private readonly ConcurrentQueue<RowDataPacket> rowDataQueue = new();
+        private DateTime _lastUpdated;
+        private readonly ConcurrentDictionary<ulong, RepeatedField<string>> _parameterListDataFormatCache = new();
+        private readonly ConcurrentQueue<PeriodicDataPacket> _periodicDataQueue = new();
+        private readonly ConcurrentQueue<RowDataPacket> _rowDataQueue = new();
 
         public Session(IClientSession clientSession,
             AtlasSessionWriter sessionWriter, string dataSource)
         {
-            this.clientSession = clientSession;
-            packetReaderServiceClient = RemoteStreamingApiClient.GetPacketReaderClient();
-            dataFormatManagerServiceClient = RemoteStreamingApiClient.GetDataFormatManagerClient();
-            this.sessionWriter = sessionWriter;
-            this.dataSource = dataSource;
-            lastUpdated = DateTime.Now;
-            configProcessor = new ConfigurationProcessor(sessionWriter, clientSession);
-            configProcessor.ProcessPeriodicComplete += ConfigProcessor_ProcessPeriodicComplete;
-            configProcessor.ProcessEventComplete += ConfigProcessor_ProcessEventComplete;
-            configProcessor.ProcessComplete += ConfigProcessor_ProcessCompleteRow;
+            this._clientSession = clientSession;
+            _packetReaderServiceClient = RemoteStreamingApiClient.GetPacketReaderClient();
+            _dataFormatManagerServiceClient = RemoteStreamingApiClient.GetDataFormatManagerClient();
+            this._sessionWriter = sessionWriter;
+            this._dataSource = dataSource;
+            _lastUpdated = DateTime.Now;
+            _configProcessor = new ConfigurationProcessor(sessionWriter, clientSession);
+            _configProcessor.ProcessPeriodicComplete += OnProcessPeriodicComplete;
+            _configProcessor.ProcessEventComplete += OnProcessorProcessEventComplete;
+            _configProcessor.ProcessRowComplete += OnProcessRowComplete;
         }
 
         public void UpdateSessionInfo(GetSessionInfoResponse sessionInfo)
         {
-            sessionWriter.UpdateSessionInfo(clientSession, sessionInfo);
+            AtlasSessionWriter.UpdateSessionInfo(_clientSession, sessionInfo);
         }
-
 
         public void EndSession()
         {
@@ -56,9 +55,9 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             do
             {
                 Task.Delay(1000).Wait();
-            } while (DateTime.Now - lastUpdated < TimeSpan.FromSeconds(120));
+            } while (DateTime.Now - _lastUpdated < TimeSpan.FromSeconds(120));
 
-            sessionWriter.CloseSession(clientSession);
+            AtlasSessionWriter.CloseSession(_clientSession);
         }
 
         public void ReadPackets(CancellationToken cancellationToken, Connection connectionDetails)
@@ -92,69 +91,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             }, cancellationToken);
             
         }
-
-        private AsyncServerStreamingCall<ReadPacketsResponse>? CreateStream(
-            Connection connectionDetails)
-        {
-            return packetReaderServiceClient.ReadPackets(new ReadPacketsRequest()
-                { Connection = connectionDetails });
-        }
-
-        private void ConfigProcessor_ProcessEventComplete(object? sender, EventArgs e)
-        {
-            var dataQueue = eventPacketQueue.ToArray();
-            eventPacketQueue.Clear();
-            foreach (var packet in dataQueue) HandleEventPacket(packet);
-        }
-
-        private void ConfigProcessor_ProcessCompleteRow(object? sender, EventArgs e)
-        {
-            var dataQueue = rowDataQueue.ToArray();
-            rowDataQueue.Clear();
-            foreach (var packet in dataQueue)
-                HandleRowData(packet);
-        }
-
-        private void ConfigProcessor_ProcessPeriodicComplete(object? sender, EventArgs e)
-        {
-            var dataQueue = periodicDataQueue.ToArray();
-            periodicDataQueue.Clear();
-            foreach (var packet in dataQueue)
-                HandlePeriodicPacket(packet);
-        }
-
-        //public void GetEssentialPacket(CancellationToken cancellationToken, Connection connectionDetails)
-        //{
-        //    var essentialsPacketStream = packetReaderServiceClient.ReadEssentials(new ReadEssentialsRequest()
-        //        { Connection = connectionDetails }).ResponseStream;
-        //    var task = Task.Run(async () =>
-        //    {
-        //        try
-        //        {
-        //            while (!cancellationToken.IsCancellationRequested)
-        //            {
-        //                while (await essentialsPacketStream.MoveNext(cancellationToken))
-        //                {
-        //                    var messages = essentialsPacketStream.Current.Response;
-
-        //                    foreach (var message in messages)
-        //                    {
-        //                        Console.WriteLine($"ESSENTIALS : New Packet {message.Packet.Type}");
-        //                        HandleNewPacket(message.Packet);
-        //                    }
-        //                }
-
-        //                return;
-        //            }
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            Console.WriteLine($"Unable to get essentials packet due to {ex.Message}.");
-        //        }
-        //    }, cancellationToken);
-        //}
-
-        public Task HandleNewPacket(Packet packet)
+        private Task HandleNewPacket(Packet packet)
         {
             var packetType = packet.Type;
             var content = packet.Content;
@@ -162,12 +99,6 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             {
                 switch (packetType)
                 {
-                    //case "Configuration":
-                    //{
-                    //    var packetConfig = ConfigurationPacket.Parser.ParseFrom(content);
-                    //    sessionWriter.AddConfiguration(clientSession, packetConfig);
-                    //    break;
-                    //}
                     case "PeriodicData":
                     {
                         var periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
@@ -205,7 +136,7 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                     }
                 }
 
-                lastUpdated = DateTime.Now;
+                _lastUpdated = DateTime.Now;
             }
             catch (Exception ex)
             {
@@ -231,14 +162,16 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             }
 
             var newParameters = parameterList
-                .Where(x => !sessionWriter.IsParameterExistInConfig(x, packet.Interval)).ToList();
+                .Where(x => !_sessionWriter.IsParameterExistInConfig(x, packet.Interval))
+                .ToList();
+
             if (newParameters.Any())
             {
                 // If the packet contains new parameters, put it in the list parameters to add to config and queue the packet to process later.
                 foreach (var parameter in newParameters)
-                    configProcessor.AddPeriodicPacketParameter(new Tuple<string, uint>(parameter, packet.Interval));
-                periodicDataQueue.Enqueue(packet);
-                lastUpdated = DateTime.Now;
+                    _configProcessor.AddPeriodicPacketParameter(new Tuple<string, uint>(parameter, packet.Interval));
+                _periodicDataQueue.Enqueue(packet);
+                _lastUpdated = DateTime.Now;
                 return;
             }
 
@@ -246,47 +179,47 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             {
                 var parameterIdentifier = parameterList[i];
                 var column = packet.Columns[i];
-                lastUpdated = DateTime.Now;
+                _lastUpdated = DateTime.Now;
                 switch (column.ListCase)
                 {
                     case SampleColumn.ListOneofCase.DoubleSamples:
                     {
                         var samples = column.DoubleSamples.Samples.Select(x => x.Value).ToList();
-                        if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
+                        if (_sessionWriter.TryAddPeriodicData(_clientSession, parameterIdentifier,
                                 samples, (long)packet.StartTime % NumberOfNanosecondsInDay, packet.Interval))
                         {
                             break;
                         }
 
                         Console.WriteLine($"Failed to write data for periodic parameter {parameterIdentifier}.");
-                        periodicDataQueue.Enqueue(packet);
+                        _periodicDataQueue.Enqueue(packet);
                         break;
                     }
                     case SampleColumn.ListOneofCase.Int32Samples:
                     {
                         var samples = column.Int32Samples.Samples.Select(x => (double)x.Value).ToList();
-                        if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
+                        if (_sessionWriter.TryAddPeriodicData(_clientSession, parameterIdentifier,
                                 samples, (long)packet.StartTime % NumberOfNanosecondsInDay, packet.Interval))
                         {
                             break;
                         }
 
                         Console.WriteLine($"Failed to write data for periodic parameter {parameterIdentifier}.");
-                        periodicDataQueue.Enqueue(packet);
+                        _periodicDataQueue.Enqueue(packet);
 
                         break;
                     }
                     case SampleColumn.ListOneofCase.BoolSamples:
                     {
                         var samples = column.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0).ToList();
-                        if (sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
+                        if (_sessionWriter.TryAddPeriodicData(_clientSession, parameterIdentifier,
                                 samples, (long)packet.StartTime % NumberOfNanosecondsInDay, packet.Interval))
                         {
                             break;
                         }
 
                         Console.WriteLine($"Failed to write data for periodic parameter {parameterIdentifier}.");
-                        periodicDataQueue.Enqueue(packet);
+                        _periodicDataQueue.Enqueue(packet);
 
                         break;
                     }
@@ -320,14 +253,16 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                 parameterList = new RepeatedField<string>();
             }
 
-            var newParameters = parameterList.Where(x => !sessionWriter.channelIdParameterDictionary.ContainsKey(x))
+            var newParameters = parameterList
+                .Where(x => !_sessionWriter.IsParameterExistInConfig(x))
                 .ToList();
+
             if (newParameters.Any())
             {
                 // If the packet contains new parameters, put it in the parameter list to add to config and queue the packet to process later.
-                configProcessor.AddPacketParameter(newParameters);
-                rowDataQueue.Enqueue(packet);
-                lastUpdated = DateTime.Now;
+                _configProcessor.AddRowPacketParameter(newParameters);
+                _rowDataQueue.Enqueue(packet);
+                _lastUpdated = DateTime.Now;
                 return;
             }
 
@@ -335,41 +270,41 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
             {
                 var row = packet.Rows[i];
                 var timestamp = (long)packet.Timestamps[i] % NumberOfNanosecondsInDay;
-                lastUpdated = DateTime.Now;
+                _lastUpdated = DateTime.Now;
 
                 switch (row.ListCase)
                 {
                     case SampleRow.ListOneofCase.DoubleSamples:
                     {
-                        if (sessionWriter.TryAddData(clientSession, parameterList,
+                        if (_sessionWriter.TryAddData(_clientSession, parameterList,
                                 row.DoubleSamples.Samples.Select(x => x.Value).ToList(), timestamp))
                         {
                             continue;
                         }
                         Console.WriteLine($"Failed to write data.");
-                        rowDataQueue.Enqueue(packet);
+                        _rowDataQueue.Enqueue(packet);
                         break;
                     }
                     case SampleRow.ListOneofCase.Int32Samples:
                     {
-                        if (sessionWriter.TryAddData(clientSession, parameterList,
+                        if (_sessionWriter.TryAddData(_clientSession, parameterList,
                                 row.Int32Samples.Samples.Select(x => (double)x.Value).ToList(), timestamp))
                         {
                             continue;
                         }
                         Console.WriteLine($"Failed to write data.");
-                        rowDataQueue.Enqueue(packet);
+                        _rowDataQueue.Enqueue(packet);
                         break;
                     }
                     case SampleRow.ListOneofCase.BoolSamples:
                     {
-                        if (sessionWriter.TryAddData(clientSession, parameterList,
+                        if (_sessionWriter.TryAddData(_clientSession, parameterList,
                                 row.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0).ToList(), timestamp))
                         {
                             continue;
                         }
                         Console.WriteLine($"Failed to write data.");
-                        rowDataQueue.Enqueue(packet);
+                        _rowDataQueue.Enqueue(packet);
                         break;
                     }
                     case SampleRow.ListOneofCase.StringSamples:
@@ -391,10 +326,10 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
         {
             var timestamp = (long)packet.Timestamp % NumberOfNanosecondsInDay;
             if (packet.Type == "Lap Trigger")
-                sessionWriter.AddLap(clientSession, timestamp, (short)packet.Value, packet.Label, true);
+                _sessionWriter.AddLap(_clientSession, timestamp, (short)packet.Value, packet.Label, true);
             else
-                sessionWriter.AddMarker(clientSession, timestamp, packet.Label);
-            lastUpdated = DateTime.Now;
+                _sessionWriter.AddMarker(_clientSession, timestamp, packet.Label);
+            _lastUpdated = DateTime.Now;
         }
 
         private void HandleMetadataPacket(MetadataPacket packet)
@@ -408,54 +343,81 @@ namespace Stream.Api.Stream.Reader.SerialSqlRace
                 ? GetEventIdentifier(packet.DataFormat.DataFormatIdentifier)
                 : packet.DataFormat.EventIdentifier;
 
-            if (!sessionWriter.eventDefCache.ContainsKey(eventIdentifier))
+            if (!_sessionWriter.EventDefCache.ContainsKey(eventIdentifier))
             {
-                configProcessor.AddPacketEvent(eventIdentifier);
-                eventPacketQueue.Enqueue(packet);
+                _configProcessor.AddPacketEvent(eventIdentifier);
+                _eventPacketQueue.Enqueue(packet);
                 return;
             }
 
             var timestamp = (long)packet.Timestamp % NumberOfNanosecondsInDay;
             var values = new List<double>();
             values.AddRange(packet.RawValues);
-            lastUpdated = DateTime.Now;
-            if (sessionWriter.TryAddEvent(clientSession, eventIdentifier, timestamp, values))
+            _lastUpdated = DateTime.Now;
+            if (_sessionWriter.TryAddEvent(_clientSession, eventIdentifier, timestamp, values))
             {
                 return;
             }
-            eventPacketQueue.Enqueue(packet);
+            _eventPacketQueue.Enqueue(packet);
             Console.WriteLine($"Failed to write event {eventIdentifier}.");
         }
 
         private RepeatedField<string> GetParameterList(ulong dataFormatId)
         {
-            if (parameterListDataFormatCache.TryGetValue(dataFormatId, out RepeatedField<string>? parameterList))
+            if (_parameterListDataFormatCache.TryGetValue(dataFormatId, out RepeatedField<string>? parameterList))
                 return parameterList;
 
-            parameterList = dataFormatManagerServiceClient.GetParametersList(new GetParametersListRequest()
+            parameterList = _dataFormatManagerServiceClient.GetParametersList(new GetParametersListRequest()
             {
                 DataFormatIdentifier = dataFormatId,
-                DataSource = dataSource
+                DataSource = _dataSource
             }).Parameters;
 
-            parameterListDataFormatCache[dataFormatId] = parameterList;
+            _parameterListDataFormatCache[dataFormatId] = parameterList;
 
             return parameterList;
         }
-
+        private AsyncServerStreamingCall<ReadPacketsResponse>? CreateStream(
+            Connection connectionDetails)
+        {
+            return _packetReaderServiceClient.ReadPackets(new ReadPacketsRequest()
+                { Connection = connectionDetails });
+        }
         private string GetEventIdentifier(ulong dataFormatId)
         {
-            if (eventIdentifierDataFormatCache.TryGetValue(dataFormatId, out string? eventIdentifier))
+            if (_eventIdentifierDataFormatCache.TryGetValue(dataFormatId, out string? eventIdentifier))
                 return eventIdentifier;
 
-            eventIdentifier = dataFormatManagerServiceClient.GetEvent(new GetEventRequest()
+            eventIdentifier = _dataFormatManagerServiceClient.GetEvent(new GetEventRequest()
             {
                 DataFormatIdentifier = dataFormatId,
-                DataSource = dataSource
+                DataSource = _dataSource
             }).Event;
-            eventIdentifierDataFormatCache[dataFormatId] = eventIdentifier;
+            _eventIdentifierDataFormatCache[dataFormatId] = eventIdentifier;
 
             return eventIdentifier;
+        }
+        private void OnProcessorProcessEventComplete(object? sender, EventArgs e)
+        {
+            var dataQueue = _eventPacketQueue.ToArray();
+            _eventPacketQueue.Clear();
+            foreach (var packet in dataQueue) HandleEventPacket(packet);
+        }
+
+        private void OnProcessRowComplete(object? sender, EventArgs e)
+        {
+            var dataQueue = _rowDataQueue.ToArray();
+            _rowDataQueue.Clear();
+            foreach (var packet in dataQueue)
+                HandleRowData(packet);
+        }
+
+        private void OnProcessPeriodicComplete(object? sender, EventArgs e)
+        {
+            var dataQueue = _periodicDataQueue.ToArray();
+            _periodicDataQueue.Clear();
+            foreach (var packet in dataQueue)
+                HandlePeriodicPacket(packet);
         }
     }
 }
