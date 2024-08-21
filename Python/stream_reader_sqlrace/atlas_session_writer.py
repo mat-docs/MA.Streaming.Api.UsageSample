@@ -73,8 +73,10 @@ class AtlasSessionWriter:
                  session_identifier=f"Stream API DEMO {datetime.datetime.now()}"):
         self.sql_race_connection = None
         self.session = None
+        self.event_identifier_mapping = {}
+        self.event_application_group_mapping = {}
         self.parameter_channel_id_mapping = {}
-        self.create_sqlrace_session(data_source,database,session_identifier)
+        self.create_sqlrace_session(data_source, database, session_identifier)
 
     def create_sqlrace_session(self, data_source: str, database: str, session_identifier):
         sql_db_connection = SQLRaceDBConnection(
@@ -141,6 +143,8 @@ class AtlasSessionWriter:
         # find all application groups
         for parameter_definition in packet.parameter_definitions:
             app_groups.add(parameter_definition.application_name)
+        for event_definition in packet.event_definitions:
+            app_groups.add(event_definition.application_name)
 
         # add applications and parameter group for all the app groups
         for app in app_groups:
@@ -256,6 +260,8 @@ class AtlasSessionWriter:
             # .NET objects, so pylint: disable=invalid-name
             conversionFunctionNames = Array[String](conversion_function_names)
 
+            self.event_identifier_mapping[event_definition.identifier] = event_definition.definition_id
+            self.event_application_group_mapping[event_definition.identifier] = event_definition.application_name
             # .NET objects, so pylint: disable=invalid-name
             eventDefinition = EventDefinition(
                 event_definition.definition_id,
@@ -370,27 +376,55 @@ class AtlasSessionWriter:
         new_markers = Array[Marker]([new_point_marker])
         self.session.Markers.Add(new_markers)
 
-    def add_event_data(self, event_definition_key, event_time, raw_data):
+    def add_event_data(self, event_identifier: str, event_time: int, raw_data):
         """Add an event instance data to the session."""
+        app_group = self.event_application_group_mapping[event_identifier]
         raw_data = Array[Double](raw_data)
-        self.session.Events.AddEventData(
-            event_definition_key, "", event_time, raw_data  # default to no group name
-        )
+        if event_identifier in self.event_identifier_mapping:
+            event_definition_key = self.event_identifier_mapping[event_identifier]
+            self.session.Events.AddEventData(
+                event_definition_key, app_group, int(event_time), raw_data  # default to no group name
+            )
+            return
+        else:
+            logger.warning(
+                "No config processed for event %s, data not added",
+                event_identifier,
+            )
+            return False
 
-    def add_missing_configration(self, parameter_identifiers: List[str]):
-        missing_config = open_data_pb2.ConfigurationPacket()
+    def add_missing_configration(self, parameter_identifiers: List[str], event_identifiers: List[str]):
         parameter_definitions = []
         for parameter_identifier in parameter_identifiers:
             if parameter_identifier not in self.parameter_channel_id_mapping.keys():
                 param_def = self.build_parameter_definition_packet(*parameter_identifier.split(":"))
                 parameter_definitions.append(param_def)
+
+        event_definitions = []
+
+        for event_identifier in event_identifiers:
+            event_definition_id = time.time_ns()//2**31
+            app = "StreamAPI"
+            event_definition = open_data_pb2.EventDefinition(
+                identifier=event_identifier,
+                name=event_identifier,
+                application_name=app,
+                description=event_identifier,
+                definition_id=event_definition_id,
+                priority=open_data_pb2.EVENT_PRIORITY_UNSPECIFIED,
+            )
+            event_definitions.append(event_definition)
+
         config_id = str(time.time_ns())
         config_packet = open_data_pb2.ConfigurationPacket(
             config_id=config_id,
             parameter_definitions=parameter_definitions,
+            event_definitions=event_definitions,
         )
-        if len(parameter_definitions) != 0:
+
+        if len(parameter_definitions) != 0 or len(event_definitions) != 0:
             logger.info("Adding missing config for %i parameters.", len(parameter_definitions))
+            logger.info("Adding missing config for %i events.", len(event_definitions))
             self.add_configration(config_packet)
 
     def build_parameter_definition_packet(self, name: str, app: str = "StreamAPI"):

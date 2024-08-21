@@ -38,6 +38,7 @@ class StreamReaderSql:
         self.last_processed = datetime.now()
         self.packets_to_add = deque()
         self.identifiers_with_missing_config = set()
+        self.events_with_missing_config = set()
         self.add_missing_config = True
         self.connection = None
         self.data_source = "SampleDataSource"
@@ -149,6 +150,28 @@ class StreamReaderSql:
         logger.debug("Missing config packet added to queue")
         return missing_config
 
+    async def handle_event_packet_missing_config(self, packet: open_data_pb2.EventPacket, event_identifier: str):
+        """Process the packet for missing config.
+
+        Args:
+            packet: packet
+            event_identifier: event identifier within the packet
+
+        Returns:
+            True if there is missing config.
+        """
+        missing_config = False
+        if event_identifier not in self.session_writer.event_identifier_mapping.keys():
+            self.events_with_missing_config.add(event_identifier)
+            missing_config = True
+
+        if not missing_config:
+            return missing_config
+
+        self.packets_to_add.appendleft(packet)
+        logger.debug("Missing config packet added to queue")
+        return missing_config
+
     async def schedule_process_queue(self):
         while True:  # Terminated by cancelling main task.
             await asyncio.sleep(30)
@@ -159,14 +182,20 @@ class StreamReaderSql:
                 break
 
     async def process_queue(self):
-        self.session_writer.add_missing_configration(list(self.identifiers_with_missing_config.copy()))
+        self.session_writer.add_missing_configration(
+            list(self.identifiers_with_missing_config.copy()),
+            list(self.events_with_missing_config.copy())
+        )
         self.identifiers_with_missing_config.clear()
+        self.events_with_missing_config.clear()
 
         packets = list(self.packets_to_add)
         self.packets_to_add.clear()
         self.packets_to_add.extendleft(packets[self.packet_queue_limit:])
         packets = packets[:self.packet_queue_limit]
-        logger.info("Processing %i packets from queue. Remaining queue length: %i", len(packets), len(self.packets_to_add))
+
+        logger.info("Processing %i packets from queue. Remaining queue length: %i", len(packets),
+                    len(self.packets_to_add))
 
         await asyncio.gather(*[self.route_new_packet(packets) for packets in packets])
 
@@ -214,8 +243,7 @@ class StreamReaderSql:
             await self.handle_row_packet(packet)
         elif isinstance(packet, open_data_pb2.EventPacket):
             logger.debug("Event packet received.")
-            pass
-            # await self.handle_event_packet(packet)
+            await self.handle_event_packet(packet)
         elif isinstance(packet, open_data_pb2.MarkerPacket):
             logger.debug("Marker packet received.")
             await self.handle_marker_packet(packet)
@@ -341,6 +369,13 @@ class StreamReaderSql:
             event_identifier = event_identifier_response.event
         else:
             event_identifier = packet.data_format.event_identifier
+
+        # add config if there are no config for the parameters
+        if self.add_missing_config:
+            if await self.handle_event_packet_missing_config(packet, event_identifier):
+                # If there are missing config then the packet is added to the queue and
+                # we return early
+                return
         timestamps_ns = packet.timestamp
         timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
         self.session_writer.add_event_data(
@@ -400,7 +435,8 @@ class StreamReaderSql:
         self.connection = connection_response.connection
 
         # Create a corresponding ATLAS session
-        self.session_writer = AtlasSessionWriter(self.sqlrace_data_source,self.sqlrace_database,session_info_response.identifier)
+        self.session_writer = AtlasSessionWriter(self.sqlrace_data_source, self.sqlrace_database,
+                                                 session_info_response.identifier)
         self.data_format_cache = DataFormatCache(self.data_source, self.grpc_address)
         self.row_packet_processor = RowPacketProcessor(self.session_writer, self.data_format_cache)
 
@@ -424,10 +460,10 @@ class StreamReaderSql:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s	%(thread)d %(levelname)s %(name)s %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(thread)d  %(levelname)s %(name)s %(message)s")
 
     data_source = r"MCLA-5JRZTQ3\LOCAL"
     database = "SQLRACE01"
-    with StreamReaderSql(data_source,database) as stream_recorder:
+    with StreamReaderSql(data_source, database) as stream_recorder:
         stream_recorder.data_source = "Default"
         asyncio.run(stream_recorder.main())
