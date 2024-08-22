@@ -65,8 +65,15 @@ class StreamReaderSql:
     async def async_stop(self):
         while len(self.packets_to_add) > 0:
             await self.process_queue()
-        self.row_packet_processor.stop()
-        self.session_writer.close_session()
+        if self.row_packet_processor is not None:
+            self.row_packet_processor.stop()
+        if self.session_writer is not None:
+            session_info_response = self.stream_api.session_management_service_stub.GetSessionInfo(
+                api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+            )
+            self.is_session_complete = session_info_response.is_complete
+            self.session_writer.session.UpdateIdentifier(session_info_response.identifier)
+            self.session_writer.close_session()
         close_session_response = (
             self.stream_api.connection_manager_service_stub.CloseConnection(
                 api_pb2.CloseConnectionRequest(connection=self.connection)
@@ -419,6 +426,11 @@ class StreamReaderSql:
             api_pb2.GetSessionInfoRequest(session_key=self.session_key)
         )
         self.is_session_complete = session_info_response.is_complete
+        while session_info_response.identifier == '':
+            session_info_response = session_management_stub.GetSessionInfo(
+                api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+            )
+            self.is_session_complete = session_info_response.is_complete
 
         # Establish a new connection
         connection_details = api_pb2.ConnectionDetails(
