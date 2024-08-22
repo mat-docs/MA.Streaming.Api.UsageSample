@@ -2,6 +2,7 @@
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net;
 using Google.Protobuf.Collections;
 using MA.Streaming.API;
@@ -124,17 +125,19 @@ namespace Stream.Api.Stream.Reader
             var configSetIdentifier = Guid.NewGuid().ToString();
             var config = _configSetManager.Create(_connectionString, configSetIdentifier, "");
             config.AddConversion(_defaultConversion);
-            var parameterGroup = new ParameterGroup("Stream API");
-            config.AddParameterGroup(parameterGroup);
-            var applicationGroup =
-                new ApplicationGroup("Stream API", "Stream API", new List<string>() { "Stream API" })
-                {
-                    SupportsRda = false
-                };
-            config.AddGroup(applicationGroup);
+            
             var channelsToAdd = new Dictionary<string, Tuple<uint, uint>>();
             foreach (var parameter in parameterIdentifiers)
             {
+                var parameterGroup = new ParameterGroup(parameter.Item1.Split(':')[1]);
+                config.AddParameterGroup(parameterGroup);
+                var applicationGroup =
+                    new ApplicationGroup(parameter.Item1.Split(':')[1], parameter.Item1.Split(':')[1], new List<string>() { parameterGroup.Identifier })
+                    {
+                        SupportsRda = false
+                    };
+                config.AddGroup(applicationGroup);
+
                 var channelId = GenerateUniqueChannelId(clientSession);
                 channelsToAdd[parameter.Item1] = new Tuple<uint, uint>(parameter.Item2, channelId);
                 var parameterChannel = new Channel(channelId, parameter.Item1, parameter.Item2, DataType.Double64Bit,
@@ -204,19 +207,19 @@ namespace Stream.Api.Stream.Reader
 
             config.AddConversion(_defaultConversion);
 
-            var parameterGroup = new ParameterGroup("Stream API");
-            config.AddParameterGroup(parameterGroup);
-
-            var applicationGroup =
-                new ApplicationGroup("Stream API", "Stream API", new List<string>() { "Stream API" })
-                {
-                    SupportsRda = false
-                };
-            config.AddGroup(applicationGroup);
-
             var channelsToAdd = new Dictionary<string, uint>();
             foreach (var parameterIdentifier in parameterIdentifiers)
             {
+                var parameterGroup = new ParameterGroup(parameterIdentifier.Split(':')[1]);
+                config.AddParameterGroup(parameterGroup);
+
+                var applicationGroup =
+                    new ApplicationGroup(parameterIdentifier.Split(':')[1], parameterIdentifier.Split(':')[1], new List<string>() { parameterGroup.Identifier })
+                    {
+                        SupportsRda = false
+                    };
+                config.AddGroup(applicationGroup);
+
                 var channelId = GenerateUniqueChannelId(clientSession);
                 channelsToAdd[parameterIdentifier] = channelId;
                 var parameterChannel = new Channel(channelId, parameterIdentifier, 0, DataType.Double64Bit,
@@ -270,26 +273,25 @@ namespace Stream.Api.Stream.Reader
             var config = _configSetManager.Create(_connectionString, configSetIdentifier, "");
             config.AddConversion(_defaultConversion);
 
-            var parameterGroup = new ParameterGroup("Stream API");
-            config.AddParameterGroup(parameterGroup);
-
-            var applicationGroup =
-                new ApplicationGroup("Stream API", "Stream API", new List<string>() { "Stream API" })
-                {
-                    SupportsRda = false
-                };
-            config.AddGroup(applicationGroup);
-
             var eventsToAdd = new Dictionary<string, EventDefinition>();
             foreach (var eventIdentifier in eventIdentifiers)
             {
-                var eventDefId = Random.Shared.Next(0, 600);
+                var appGroupName = eventIdentifier.Split(':')[1];
+
+                var applicationGroup =
+                    new ApplicationGroup(appGroupName, appGroupName)
+                    {
+                        SupportsRda = false
+                    };
+                config.AddGroup(applicationGroup);
+
+                var eventDefId = int.Parse(eventIdentifier.Split(':')[0], NumberStyles.AllowHexSpecifier);
                 var eventDefinitionSql = new EventDefinition(
                     eventDefId,
                     eventIdentifier,
                     EventPriorityType.Low,
                     new List<string>() { "DefaultConversion", "DefaultConversion", "DefaultConversion" },
-                    "Stream API"
+                    appGroupName
                 );
                 config.AddEventDefinition(eventDefinitionSql);
                 eventsToAdd[eventIdentifier] = eventDefinitionSql;
@@ -453,15 +455,14 @@ namespace Stream.Api.Stream.Reader
         }
 
         public bool TryAddEvent(IClientSession clientSession, string eventIdentifier, long timestamp,
-            IList<double> data,
-            string groupName = "Stream API")
+            IList<double> data)
         {
             try
             {
                 lock (_configLock)
                 {
                     clientSession.Session.Events.AddEventData(EventDefCache[eventIdentifier].EventDefinitionId,
-                        groupName,
+                        EventDefCache[eventIdentifier].GroupName,
                         timestamp,
                         data);
                 }
