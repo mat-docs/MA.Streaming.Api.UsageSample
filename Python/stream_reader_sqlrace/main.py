@@ -46,14 +46,16 @@ class StreamReaderSql:
         self.stream_api = StreamApi(self.grpc_address)
         self.session_key = None
         self.main_task = None
+        self.read_essentials_task = None
+        self.schedule_process_queue_task = None
         self.is_session_complete = False
         self.sqlrace_data_source = data_source
         self.sqlrace_database = database
         self.session_writer: AtlasSessionWriter = None
         self.row_packet_processor: RowPacketProcessor = None
-        self.data_format_cache:DataFormatCache = None
+        self.data_format_cache: DataFormatCache = None
         self.packet_queue_limit = 200_000
-        self.missing_config_limit = 200_000
+        self.process_queue_interval = 30
         self.terminate = threading.Event()
 
     def __enter__(self):
@@ -85,6 +87,7 @@ class StreamReaderSql:
             logger.warning("Connection was not successfully closed. ")
 
     async def session_stop(self):
+        # If the session is live, subscribe to the session stop notification
         if not self.is_session_complete:
             async with grpc.aio.insecure_channel(self.grpc_address) as channel:
                 session_management_stub = api_pb2_grpc.SessionManagementServiceStub(channel)
@@ -93,44 +96,43 @@ class StreamReaderSql:
                 ) in session_management_stub.GetSessionStopNotification(
                     api_pb2.GetSessionStopNotificationRequest(data_source=self.data_source)
                 ):
-                    print(stop_notification.session_key)
-                    break
+                    logger.debug("Stop notification received for session: %s", stop_notification.session_key)
+                    if stop_notification.session_key == self.session_key:
+                        break
 
-        while (datetime.now() - self.last_processed < timedelta(seconds=10)) or (len(self.packets_to_add) > 0):
-            await asyncio.sleep(15)
+        while (datetime.now() - self.last_processed < timedelta(seconds=self.process_queue_interval+5)) or (len(self.packets_to_add) > 0):
+            await asyncio.sleep(self.process_queue_interval+10)
         self.terminate_main_task()
         await self.async_stop()
 
     def terminate_main_task(self, *_):
         logger.info("Terminating main task.")
-        # self.main_task.cancel()
+        self.main_task.cancel()
+        self.read_essentials_task.cancel()
         self.terminate.set()
 
-
     async def read_essentials(self):
+        logger.info("Start reading essential packets")
         async with grpc.aio.insecure_channel(self.grpc_address) as channel:
             packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
             async for essentials_packet_response in packet_reader_stub.ReadEssentials(
-                api_pb2.ReadEssentialsRequest(connection=self.connection)
+                    api_pb2.ReadEssentialsRequest(connection=self.connection)
             ):
                 logger.debug("New essential packet received.")
                 new_packet = essentials_packet_response.response[0].packet
                 await self.deserialize_new_packet(new_packet)
                 await self.process_queue()
-                if self.terminate.is_set():
-                    break
 
     async def read_packets(self):
+        logger.info("Start reading packets")
         async with grpc.aio.insecure_channel(self.grpc_address) as channel:
             packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
             async for new_packet_response in packet_reader_stub.ReadPackets(
-                api_pb2.ReadPacketsRequest(connection=self.connection)
+                    api_pb2.ReadPacketsRequest(connection=self.connection)
             ):
                 logger.debug("New packet received.")
                 new_packet = new_packet_response.response[0].packet
                 await self.deserialize_new_packet(new_packet, True)
-                if self.terminate.is_set():
-                    break
 
     async def handle_packet_missing_config(self, packet, parameter_identifiers):
         """Process the packet for missing config.
@@ -198,7 +200,7 @@ class StreamReaderSql:
 
         packets = list(self.packets_to_add)
         self.packets_to_add.clear()
-        self.packets_to_add.extendleft(packets[self.packet_queue_limit:])
+        self.packets_to_add.extendleft(packets[self.packet_queue_limit:][::-1])
         packets = packets[:self.packet_queue_limit]
 
         logger.info("Processing %i packets from queue. Remaining queue length: %i", len(packets),
@@ -453,17 +455,16 @@ class StreamReaderSql:
         self.row_packet_processor = RowPacketProcessor(self.session_writer, self.data_format_cache)
 
         # Read essential stream which contains essential information such as configs
-        # TODO: optional essentials
-        self.tasks.append(asyncio.create_task(
+        self.read_essentials_task = asyncio.create_task(
             self.read_essentials()
-        ))
+        )
 
         # Read packets and monitor session stop at the same time
         self.main_task = asyncio.gather(
             self.session_stop(),
             self.read_packets(),
-            self.schedule_process_queue(),
         )
+        self.schedule_process_queue_task = asyncio.create_task(self.schedule_process_queue())
         try:
             logger.debug("Starting main task.")
             await self.main_task
