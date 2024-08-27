@@ -69,12 +69,14 @@ class StreamReaderSql:
             await self.process_queue()
         if self.row_packet_processor is not None:
             self.row_packet_processor.stop()
-        if self.session_writer is not None:
+        # if the session writer is initialized and the session hasn't been closed yet.
+        if self.session_writer is not None and self.session_writer.sql_race_connection is not None:
             session_info_response = self.stream_api.session_management_service_stub.GetSessionInfo(
                 api_pb2.GetSessionInfoRequest(session_key=self.session_key)
             )
             self.is_session_complete = session_info_response.is_complete
             self.session_writer.session.UpdateIdentifier(session_info_response.identifier)
+            self.session_writer.add_details("Data Source", self.data_source)
             self.session_writer.close_session()
         close_session_response = (
             self.stream_api.connection_manager_service_stub.CloseConnection(
@@ -84,7 +86,7 @@ class StreamReaderSql:
         if close_session_response.success:
             logger.info("Connection closed.")
         else:
-            logger.warning("Connection was not successfully closed. ")
+            logger.warning("Connection was not successfully closed.")
 
     async def session_stop(self):
         # If the session is live, subscribe to the session stop notification
@@ -467,7 +469,7 @@ class StreamReaderSql:
             logger.debug("Starting main task.")
             await self.main_task
         except asyncio.CancelledError:
-            logger.info("Terminating...")
+            logger.info("Main task terminated.")
 
 
 if __name__ == "__main__":
