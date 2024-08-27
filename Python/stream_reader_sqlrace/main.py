@@ -119,8 +119,7 @@ class StreamReaderSql:
                     api_pb2.ReadEssentialsRequest(connection=self.connection)
             ):
                 logger.debug("New essential packet received.")
-                new_packet = essentials_packet_response.response[0].packet
-                await self.deserialize_new_packet(new_packet)
+                await asyncio.gather(*[self.deserialize_new_packet(response.packet, True) for response in essentials_packet_response.response])
                 await self.process_queue()
 
     async def read_packets(self):
@@ -131,8 +130,7 @@ class StreamReaderSql:
                     api_pb2.ReadPacketsRequest(connection=self.connection)
             ):
                 logger.debug("New packet received.")
-                new_packet = new_packet_response.response[0].packet
-                await self.deserialize_new_packet(new_packet, True)
+                await asyncio.gather(*[self.deserialize_new_packet(response.packet, True) for response in new_packet_response.response])
 
     async def handle_packet_missing_config(self, packet, parameter_identifiers):
         """Process the packet for missing config.
