@@ -404,12 +404,12 @@ class AtlasSessionWriter:
 
         for event_identifier in event_identifiers:
             event_definition_id = time.time_ns()//2**31
-            app = "StreamAPI"
+
             event_definition = open_data_pb2.EventDefinition(
-                identifier=event_identifier,
-                name=event_identifier,
-                application_name=app,
-                description=event_identifier,
+                identifier=event_identifier.split(":")[0],
+                name=event_identifier.split(":")[0],
+                application_name=get_app_from_identifier(event_identifier),
+                description=event_identifier.split(":")[0],
                 definition_id=event_definition_id,
                 priority=open_data_pb2.EVENT_PRIORITY_UNSPECIFIED,
             )
@@ -443,3 +443,11 @@ class AtlasSessionWriter:
             warning_max_value=100,
         )
         return param_def
+
+
+def get_app_from_identifier(identifier: str):
+    identifier = identifier.split(":")
+    if len(identifier) == 2:
+        return identifier[1]
+    else:
+        return "StreamAPI"
