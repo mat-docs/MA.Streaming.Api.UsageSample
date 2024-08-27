@@ -308,9 +308,9 @@ class StreamReaderSql:
         timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
         # add the data to the session
         for parameter_identifier, data_for_param in zip(parameter_identifiers, data):
-            if not self.session_writer.add_data(
-                    parameter_identifier, data_for_param, timestamps_sqlrace
-            ):
+            if not await asyncio.to_thread(self.session_writer.add_data,
+                                           parameter_identifier, data_for_param, timestamps_sqlrace
+                                           ):
                 logger.warning("Failed to add data for parameter %s", parameter_identifier)
 
     async def handle_row_packet(self, packet: open_data_pb2.RowDataPacket):
