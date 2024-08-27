@@ -305,7 +305,7 @@ class StreamReaderSql:
         ## Add the data to the session
         # Create timestamps and convert them to SQLRace format.
         timestamps_ns = [start_time + interval * i for i in range(len(data[0]))]
-        timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+        timestamps_sqlrace = np.mod(timestamps_ns, np.int64(1e9 * 3600 * 24))
         # add the data to the session
         for parameter_identifier, data_for_param in zip(parameter_identifiers, data):
             if not await asyncio.to_thread(self.session_writer.add_data,
@@ -344,11 +344,11 @@ class StreamReaderSql:
     async def handle_marker_packet(self, packet: open_data_pb2.MarkerPacket):
         if packet.type == "Lap Trigger":
             timestamps_ns = packet.timestamp
-            timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+            timestamps_sqlrace = np.mod(timestamps_ns, np.int64(1e9 * 3600 * 24))
             self.session_writer.add_lap(timestamps_sqlrace, packet.value, packet.label)
         else:
             timestamps_ns = packet.timestamp
-            timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+            timestamps_sqlrace = np.mod(timestamps_ns, np.int64(1e9 * 3600 * 24))
             self.session_writer.add_marker(timestamps_sqlrace, packet.label)
 
     async def handle_metatdata_packet(self, packet: open_data_pb2.MetadataPacket):
@@ -386,7 +386,7 @@ class StreamReaderSql:
                 # we return early
                 return
         timestamps_ns = packet.timestamp
-        timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+        timestamps_sqlrace = np.mod(timestamps_ns, np.int64(1e9 * 3600 * 24))
         self.session_writer.add_event_data(
             event_identifier, timestamps_sqlrace, packet.raw_values
         )

@@ -38,7 +38,7 @@ class PacketProcessor:
                 packet.rows), "The number of timestamps should match the number of rows."
 
             for timestamps_ns, row in zip(packet.timestamps, packet.rows):
-                timestamps_sqlrace = np.mod(timestamps_ns, 1e9 * 3600 * 24)
+                timestamps_sqlrace = np.mod(timestamps_ns, np.int64(1e9 * 3600 * 24))
                 samples = getattr(row, row.WhichOneof("list")).samples
                 data = [
                     (s.value if s.status == open_data_pb2.DataStatus.DATA_STATUS_VALID else np.nan)
