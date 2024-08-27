@@ -90,12 +90,12 @@ class RowPacketProcessor:
     def schedule_process_queue(self):
         while not self.stop_event.is_set():
             time.sleep(self.process_interval)
-            self.process_queues(True)
+            self.process_queues()
             if len(self.packet_queues) != 0:
                 while self.max_queue_length > self.queue_threshold:
                     self.process_queues()
 
-    def process_queues(self, use_all_processors=False):
+    def process_queues(self, process_all_packets=False):
         if self.processing_queues:
             return
         self.processing_queues = True
@@ -107,7 +107,7 @@ class RowPacketProcessor:
         in_process_count = 0
         start_time = time.time()
         for data_format_identifier, queue in sorted_queues:
-            if time.time() - start_time > self.process_interval:
+            if not process_all_packets and time.time() - start_time > self.process_interval:
                 logger.debug("Terminating early due to timeout.")
                 break
             parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
