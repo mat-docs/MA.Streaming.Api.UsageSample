@@ -8,8 +8,5 @@ namespace Stream.Api.Stream.Reader
         public string? dataSource;
         public string? sqlRaceConnectionString;
         public string? ipAddress;
-        public int? outputFormat;
-        public string? rootPath;
-        public string? sqlDbConnectionString;
     }
 }

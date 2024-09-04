@@ -2,6 +2,7 @@
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
 using Newtonsoft.Json;
+using Stream.Api.Stream.Reader.SqlRace;
 
 namespace Stream.Api.Stream.Reader
 {
@@ -20,17 +21,17 @@ namespace Stream.Api.Stream.Reader
                 return;
             }
             var atlasSessionWriter = new AtlasSessionWriter(config.sqlRaceConnectionString);
-            var streamApiClient = new StreamApiClient(atlasSessionWriter, config);
+            var streamApiClient = new StreamApiClient(config);
+            var sessionManager = new SessionManagement(streamApiClient, atlasSessionWriter);
+
             atlasSessionWriter.Initialise();
             streamApiClient.Initialise(config.ipAddress);
-            streamApiClient.TryGetLiveSessions();
+            sessionManager.GetLiveSessions();
 
-            var task = streamApiClient.SubscribeToStartSessionNotification();
-            task.Wait();
-            Console.WriteLine("Finished recording a session from the Stream API. Press Enter to finish...");
+            Console.WriteLine("Press Enter to exit application.");
             Console.ReadLine();
+            sessionManager.CloseAllSessions();
             atlasSessionWriter.StopRecorderAndServer();
-            streamApiClient.CloseConnections();
         }
 
         public static Config? LoadJson(string filePath)
@@ -39,5 +40,6 @@ namespace Stream.Api.Stream.Reader
             var json = reader.ReadToEnd();
             return JsonConvert.DeserializeObject<Config>(json);
         }
+
     }
 }

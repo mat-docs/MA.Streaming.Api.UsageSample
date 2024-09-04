@@ -14,12 +14,13 @@ using DataType = MESL.SqlRace.Enumerators.DataType;
 using EventDefinition = MESL.SqlRace.Domain.EventDefinition;
 using Parameter = MESL.SqlRace.Domain.Parameter;
 
-namespace Stream.Api.Stream.Reader
+namespace Stream.Api.Stream.Reader.SqlRace
 {
     internal class AtlasSessionWriter
     {
         private readonly string _connectionString;
-        private readonly Dictionary<EventPriority, EventPriorityType> _eventPriorityDictionary =
+        private const long NumberOfNanosecondsInDay = 86400000000000;
+        private readonly Dictionary<EventPriority, EventPriorityType> eventPriorityDictionary =
             new()
             {
                 { EventPriority.Critical, EventPriorityType.High },
@@ -29,23 +30,20 @@ namespace Stream.Api.Stream.Reader
                 { EventPriority.Debug, EventPriorityType.Debug },
                 { EventPriority.Unspecified, EventPriorityType.Low }
             };
-        private readonly ConcurrentDictionary<string, uint> _channelIdRowParameterDictionary = new();
-        private readonly ConcurrentDictionary<string, Dictionary<uint, uint>> _channelIdPeriodicParameterDictionary = new();
+
         private readonly object _configLock = new();
         private ConfigurationSetManager? _configSetManager;
-        private uint _currentChannelId = 0;
         private Guid _recorderGuid;
         private readonly RationalConversion _defaultConversion =
             RationalConversion.CreateSimple1To1Conversion("DefaultConversion", "", "%5.2f");
         private SessionManager? _sessionManager;
         private int _sampleCounter = 0;
 
-        public ConcurrentDictionary<string, EventDefinition> EventDefCache { get; }
+        private ConcurrentDictionary<SessionKey, SessionConfig> channelIdCache = new();
 
         public AtlasSessionWriter(string connectionString)
         {
-            this._connectionString = connectionString;
-            this.EventDefCache = new ConcurrentDictionary<string, EventDefinition>();
+            _connectionString = connectionString;
         }
 
         public void Initialise()
@@ -75,7 +73,8 @@ namespace Stream.Api.Stream.Reader
             var sessionDate = DateTime.Now;
             var clientSession = _sessionManager?.CreateSession(_connectionString, sessionKey, sessionName,
                 sessionDate, sessionType);
-            Console.WriteLine($"New Session is created with name {sessionName}.");
+            this.channelIdCache[clientSession.Session.Key] = new SessionConfig();
+            Console.WriteLine($"New SqlRaceSession is created with name {sessionName}.");
             return clientSession;
         }
 
@@ -97,7 +96,7 @@ namespace Stream.Api.Stream.Reader
             }
 
             var recorderConfiguration = RecordersConfiguration.GetRecordersConfiguration();
-            this._recorderGuid = Guid.NewGuid();
+            _recorderGuid = Guid.NewGuid();
             recorderConfiguration.AddConfiguration(
                 _recorderGuid,
                 "SQLServer",
@@ -111,7 +110,7 @@ namespace Stream.Api.Stream.Reader
         public void StopRecorderAndServer()
         {
             var recorderConfiguration = RecordersConfiguration.GetRecordersConfiguration();
-            recorderConfiguration.RemoveConfiguration(this._recorderGuid);
+            recorderConfiguration.RemoveConfiguration(_recorderGuid);
             _sessionManager?.ServerListener.Stop();
         }
 
@@ -125,7 +124,7 @@ namespace Stream.Api.Stream.Reader
             var configSetIdentifier = Guid.NewGuid().ToString();
             var config = _configSetManager.Create(_connectionString, configSetIdentifier, "");
             config.AddConversion(_defaultConversion);
-            
+
             var channelsToAdd = new Dictionary<string, Tuple<uint, uint>>();
             foreach (var parameter in parameterIdentifiers)
             {
@@ -176,18 +175,18 @@ namespace Stream.Api.Stream.Reader
 
                 foreach (var parameter in channelsToAdd)
                 {
-                    if (_channelIdPeriodicParameterDictionary.TryGetValue(parameter.Key, out var intervals))
+                    if (channelIdCache[clientSession.Session.Key].ChannelIdPeriodicParameterDictionary.TryGetValue(parameter.Key, out var intervals))
                     {
                         intervals.Add(parameter.Value.Item1, parameter.Value.Item2);
-                        _channelIdPeriodicParameterDictionary[parameter.Key] = intervals;
+                        channelIdCache[clientSession.Session.Key].ChannelIdPeriodicParameterDictionary[parameter.Key] = intervals;
                     }
                     else
                     {
-                        _channelIdPeriodicParameterDictionary[parameter.Key] = new Dictionary<uint, uint>
+                        channelIdCache[clientSession.Session.Key].ChannelIdPeriodicParameterDictionary[parameter.Key] = new Dictionary<uint, uint>
                             { { parameter.Value.Item1, parameter.Value.Item2 } };
                     }
                 }
-                     
+
             }
             catch (ConfigurationSetAlreadyExistsException)
             {
@@ -255,7 +254,10 @@ namespace Stream.Api.Stream.Reader
                 clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
                 Console.WriteLine(
                     $"Successfully added configuration {configSetIdentifier} for {parameterIdentifiers.Count} parameters.");
-                foreach (var parameter in channelsToAdd) _channelIdRowParameterDictionary[parameter.Key] = parameter.Value;
+
+                foreach (var parameter in channelsToAdd)
+                    channelIdCache[clientSession.Session.Key].ChannelIdRowParameterDictionary[parameter.Key] =
+                        parameter.Value;
             }
             catch (ConfigurationSetAlreadyExistsException)
             {
@@ -307,7 +309,7 @@ namespace Stream.Api.Stream.Reader
 
                 clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
 
-                foreach (var events in eventsToAdd) EventDefCache[events.Key] = events.Value;
+                foreach (var events in eventsToAdd) channelIdCache[clientSession.Session.Key].EventDefCache[events.Key] = events.Value;
 
                 Console.WriteLine(
                     $"Successfully added configuration {configSetIdentifier} for {eventIdentifiers.Count} events");
@@ -332,14 +334,21 @@ namespace Stream.Api.Stream.Reader
             }
         }
 
-        public bool IsParameterExistInConfig(string parameterName)
+        public bool IsParameterExistInConfig(string parameterName, IClientSession clientSession)
         {
-            return _channelIdRowParameterDictionary.ContainsKey(parameterName);
+            return channelIdCache[clientSession.Session.Key].ChannelIdRowParameterDictionary.ContainsKey(parameterName);
         }
 
-        public bool IsParameterExistInConfig(string parameterName, uint interval)
+        public bool IsParameterExistInConfig(string parameterName, uint interval, IClientSession clientSession)
         {
-            return _channelIdPeriodicParameterDictionary.ContainsKey(parameterName) && _channelIdPeriodicParameterDictionary[parameterName].ContainsKey(interval);
+            return channelIdCache[clientSession.Session.Key].ChannelIdPeriodicParameterDictionary
+                .ContainsKey(parameterName) && channelIdCache[clientSession.Session.Key]
+                .ChannelIdPeriodicParameterDictionary[parameterName].ContainsKey(interval);
+        }
+
+        public bool IsEventExistInConfig(string eventName, IClientSession clientSession)
+        {
+            return channelIdCache[clientSession.Session.Key].EventDefCache.ContainsKey(eventName);
         }
 
         public bool TryAddPeriodicData(IClientSession clientSession, string parameterIdentifier, List<double> data,
@@ -355,8 +364,8 @@ namespace Stream.Api.Stream.Reader
                 }
                 lock (_configLock)
                 {
-                    clientSession.Session.AddChannelData(_channelIdPeriodicParameterDictionary[parameterIdentifier][interval],
-                        timestamp, data.Count, dataBytes);
+                    clientSession.Session.AddChannelData(channelIdCache[clientSession.Session.Key].ChannelIdPeriodicParameterDictionary[parameterIdentifier][interval],
+                        timestamp % NumberOfNanosecondsInDay, data.Count, dataBytes);
                 }
 
                 return true;
@@ -373,7 +382,7 @@ namespace Stream.Api.Stream.Reader
         {
             try
             {
-                var channelIds = parameterList.Select(x => _channelIdRowParameterDictionary[x]).ToList();
+                var channelIds = parameterList.Select(x => channelIdCache[clientSession.Session.Key].ChannelIdRowParameterDictionary[x]).ToList();
 
                 var dataBytes = data.SelectMany(BitConverter.GetBytes).ToArray();
 
@@ -385,7 +394,7 @@ namespace Stream.Api.Stream.Reader
 
                 lock (_configLock)
                 {
-                    clientSession.Session.AddRowData(timestamp, channelIds, dataBytes);
+                    clientSession.Session.AddRowData(timestamp % NumberOfNanosecondsInDay, channelIds, dataBytes);
                 }
 
                 return true;
@@ -402,7 +411,7 @@ namespace Stream.Api.Stream.Reader
             bool countForFastestLap)
         {
             var newLap = new Lap(
-                timestamp,
+                timestamp % NumberOfNanosecondsInDay,
                 lapNumber,
                 BitConverter.GetBytes(0)[0],
                 lapName,
@@ -416,7 +425,7 @@ namespace Stream.Api.Stream.Reader
                     clientSession.Session.LapCollection.Add(newLap);
                 }
 
-                Console.WriteLine($"Added lap {lapName} at {timestamp}");
+                Console.WriteLine($"Added lap {lapName} at {timestamp % NumberOfNanosecondsInDay}");
             }
             catch (Exception ex)
             {
@@ -424,12 +433,14 @@ namespace Stream.Api.Stream.Reader
             }
         }
 
-        public static void CloseSession(IClientSession clientSession)
+        public void CloseSession(IClientSession clientSession)
         {
             var identifier = clientSession.Session.Identifier;
-            clientSession.Session.EndData();
+            clientSession.Session.EndData(); ;
+            channelIdCache.TryRemove(clientSession.Session.Key, out var sessionConfig);
+            sessionConfig?.Dispose();
             clientSession.Close();
-            Console.WriteLine($"Closed Session {identifier}.");
+            Console.WriteLine($"Closed SqlRaceSession {identifier}.");
         }
 
         public static void AddDetails(IClientSession clientSession, string key, string value)
@@ -442,7 +453,7 @@ namespace Stream.Api.Stream.Reader
         {
             try
             {
-                var marker = new Marker(timestamp, label);
+                var marker = new Marker(timestamp % NumberOfNanosecondsInDay, label);
                 lock (_configLock)
                 {
                     clientSession.Session.Markers.Add(marker);
@@ -461,9 +472,9 @@ namespace Stream.Api.Stream.Reader
             {
                 lock (_configLock)
                 {
-                    clientSession.Session.Events.AddEventData(EventDefCache[eventIdentifier].EventDefinitionId,
-                        EventDefCache[eventIdentifier].GroupName,
-                        timestamp,
+                    clientSession.Session.Events.AddEventData(channelIdCache[clientSession.Session.Key].EventDefCache[eventIdentifier].EventDefinitionId,
+                        channelIdCache[clientSession.Session.Key].EventDefCache[eventIdentifier].GroupName,
+                        timestamp % NumberOfNanosecondsInDay,
                         data);
                 }
 

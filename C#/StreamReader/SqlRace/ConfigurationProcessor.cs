@@ -5,7 +5,7 @@ using System.Collections.Concurrent;
 using MA.Streaming.Core;
 using MESL.SqlRace.Domain;
 
-namespace Stream.Api.Stream.Reader
+namespace Stream.Api.Stream.Reader.SqlRace
 {
     internal class ConfigurationProcessor
     {
@@ -18,8 +18,8 @@ namespace Stream.Api.Stream.Reader
 
         public ConfigurationProcessor(AtlasSessionWriter writer, IClientSession clientSession)
         {
-            this._writer = writer;
-            this._clientSession = clientSession;
+            _writer = writer;
+            _clientSession = clientSession;
             _rowConfigProcessor =
                 new TimeAndSizeWindowBatchProcessor<List<string>>(ProcessRowConfig, new CancellationTokenSource(), 100000,
                     10000);
@@ -41,7 +41,7 @@ namespace Stream.Api.Stream.Reader
             if (!newParameters.Any()) return;
 
             foreach (var parameter in newParameters) _eventsAndParametersProcessed.Add(parameter);
-            ;
+
             _rowConfigProcessor.Add(newParameters);
         }
 
