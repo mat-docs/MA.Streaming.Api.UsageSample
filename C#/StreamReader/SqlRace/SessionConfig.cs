@@ -11,9 +11,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
 
         public void Dispose()
         {
-            ChannelIdPeriodicParameterDictionary.Clear();
-            ChannelIdRowParameterDictionary.Clear();
-            EventDefCache.Clear();
+            this.ChannelIdPeriodicParameterDictionary.Clear();
+            this.ChannelIdRowParameterDictionary.Clear();
+            this.EventDefCache.Clear();
         }
     }
 }

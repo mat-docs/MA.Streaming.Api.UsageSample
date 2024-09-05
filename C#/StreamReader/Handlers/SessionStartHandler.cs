@@ -12,7 +12,7 @@ namespace Stream.Api.Stream.Reader.Handlers
         public EventHandler<SessionKeyEventArgs>? NewSessionStart;
         public void WaitForSessionStart(IAsyncStreamReader<GetSessionStartNotificationResponse> startNotificationStream)
         {
-            var cancellationToken = tokenSource.Token;
+            var cancellationToken = this.tokenSource.Token;
             Console.WriteLine("Waiting for live session.");
             _ = Task.Run(async () =>
             {
@@ -22,7 +22,7 @@ namespace Stream.Api.Stream.Reader.Handlers
                     while (await startNotificationStream.MoveNext(cancellationToken))
                     {
                         var notificationMessage = startNotificationStream.Current;
-                        NewSessionStart?.Invoke(this, new SessionKeyEventArgs{SessionKey = notificationMessage.SessionKey});
+                        this.NewSessionStart?.Invoke(this, new SessionKeyEventArgs{SessionKey = notificationMessage.SessionKey});
                     }
                 }
                 catch (Exception ex)

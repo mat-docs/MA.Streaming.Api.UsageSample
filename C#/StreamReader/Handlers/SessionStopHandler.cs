@@ -14,7 +14,7 @@ namespace Stream.Api.Stream.Reader.Handlers
 
         public void WaitForSessionStop(IAsyncStreamReader<GetSessionStopNotificationResponse> stopNotificationStream)
         {
-            var cancellationToken = tokenSource.Token;
+            var cancellationToken = this.tokenSource.Token;
             Task.Run(async () =>
             {
                 try
@@ -27,7 +27,7 @@ namespace Stream.Api.Stream.Reader.Handlers
                             continue;
                         }
                         var stopNotificationResponse = stopNotificationStream.Current;
-                        SessionStop?.Invoke(this, new SessionKeyEventArgs{SessionKey = stopNotificationResponse.SessionKey});
+                        this.SessionStop?.Invoke(this, new SessionKeyEventArgs{SessionKey = stopNotificationResponse.SessionKey});
                         Console.WriteLine($"SqlRaceSession Ended {stopNotificationResponse.SessionKey}.");
                     }
                 }

@@ -1,5 +1,4 @@
-﻿
-namespace Stream.Api.Stream.Reader.Interfaces
+﻿namespace Stream.Api.Stream.Reader.Abstractions
 {
     internal interface ISession
     {

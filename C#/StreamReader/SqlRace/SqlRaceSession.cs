@@ -7,13 +7,13 @@ using MA.Streaming.API;
 using MA.Streaming.OpenData;
 using MESL.SqlRace.Domain;
 using Stream.Api.Stream.Reader.Handlers;
-using ISession = Stream.Api.Stream.Reader.Interfaces.ISession;
+using ISession = Stream.Api.Stream.Reader.Abstractions.ISession;
 
 namespace Stream.Api.Stream.Reader.SqlRace
 {
     internal class SqlRaceSession : ISession
     {
-        private IClientSession _clientSession;
+        private IClientSession clientSession;
         private readonly AtlasSessionWriter sessionWriter;
         private ConfigurationProcessor configProcessor;
         private readonly ConcurrentQueue<EventPacket> eventPacketQueue = new();
@@ -21,9 +21,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
         private string sessionKey;
         private Dictionary<string, long> streamsOffsetDictionary = new();
         private readonly CancellationTokenSource cancellationTokenSource = new();
-        private List<Connection> connections = new();
+        private List<Connection?> connections = new();
 
-        private DateTime _lastUpdated;
+        private DateTime lastUpdated;
         private readonly ConcurrentQueue<PeriodicDataPacket> periodicDataQueue = new();
         private readonly ConcurrentQueue<RowDataPacket> rowDataQueue = new();
         private PeriodicDataHandler periodicDataHandler;
@@ -36,13 +36,13 @@ namespace Stream.Api.Stream.Reader.SqlRace
         public SqlRaceSession(AtlasSessionWriter sessionWriter, StreamApiClient streamApiClient)
         {
             this.sessionWriter = sessionWriter;
-            _lastUpdated = DateTime.Now;
+            this.lastUpdated = DateTime.Now;
             this.streamApiClient = streamApiClient;
         }
 
         public void UpdateSessionInfo(GetSessionInfoResponse sessionInfo)
         {
-            AtlasSessionWriter.UpdateSessionInfo(_clientSession, sessionInfo);
+            AtlasSessionWriter.UpdateSessionInfo(this.clientSession, sessionInfo);
         }
 
         public void EndSession()
@@ -51,21 +51,21 @@ namespace Stream.Api.Stream.Reader.SqlRace
             do
             {
                 Task.Delay(1000).Wait();
-            } while (DateTime.Now - _lastUpdated < TimeSpan.FromSeconds(120));
+            } while (DateTime.Now - this.lastUpdated < TimeSpan.FromSeconds(120));
 
-            sessionWriter.CloseSession(_clientSession);
-            connections.ForEach(x => streamApiClient.TryCloseConnection(x));
-            configProcessor.ProcessPeriodicComplete -= OnProcessPeriodicComplete;
-            configProcessor.ProcessEventComplete -= OnProcessorProcessEventComplete;
-            configProcessor.ProcessRowComplete -= OnProcessRowComplete;
+            this.sessionWriter.CloseSession(this.clientSession);
+            this.connections.ForEach(x => this.streamApiClient.TryCloseConnection(x));
+            this.configProcessor.ProcessPeriodicComplete -= this.OnProcessPeriodicComplete;
+            this.configProcessor.ProcessEventComplete -= this.OnProcessorProcessEventComplete;
+            this.configProcessor.ProcessRowComplete -= this.OnProcessRowComplete;
             this.SessionEnded = true;
         }
 
         public void StartSession(string sessionKey)
         {
             Console.WriteLine($"New Live SqlRaceSession found with key {sessionKey}.");
-            var sessionInfo = streamApiClient.GetSessionInfo(sessionKey);
-            var sqlSession = sessionWriter.CreateSession(
+            var sessionInfo = this.streamApiClient.GetSessionInfo(sessionKey);
+            var sqlSession = this.sessionWriter.CreateSession(
                 sessionInfo.Identifier == "" ? "Untitled" : sessionInfo.Identifier,
                 sessionInfo.Type);
             if (sqlSession == null)
@@ -75,21 +75,19 @@ namespace Stream.Api.Stream.Reader.SqlRace
             }
 
             this.SessionEnded = false;
-            this._clientSession = sqlSession;
+            this.clientSession = sqlSession;
             this.sessionKey = sessionKey;
 
-            
-
-            configProcessor = new ConfigurationProcessor(sessionWriter, sqlSession);
+            this.configProcessor = new ConfigurationProcessor(this.sessionWriter, sqlSession);
             this.periodicDataHandler =
-                new PeriodicDataHandler(sessionWriter, streamApiClient, sqlSession, configProcessor);
-            this.rowDataHandler = new RowDataHandler(sessionWriter, streamApiClient, sqlSession, configProcessor);
-            this.markerHandler = new MarkerHandler(sessionWriter, streamApiClient, sqlSession);
-            this.eventDataHandler = new EventDataHandler(sessionWriter, streamApiClient, sqlSession, configProcessor);
-            configProcessor.ProcessPeriodicComplete += OnProcessPeriodicComplete;
-            configProcessor.ProcessEventComplete += OnProcessorProcessEventComplete;
-            configProcessor.ProcessRowComplete += OnProcessRowComplete;
-            Task.Run(UpdateSessionInfo);
+                new PeriodicDataHandler(this.sessionWriter, this.streamApiClient, sqlSession, this.configProcessor);
+            this.rowDataHandler = new RowDataHandler(this.sessionWriter, this.streamApiClient, sqlSession, this.configProcessor);
+            this.markerHandler = new MarkerHandler(this.sessionWriter, this.streamApiClient, sqlSession);
+            this.eventDataHandler = new EventDataHandler(this.sessionWriter, this.streamApiClient, sqlSession, this.configProcessor);
+            this.configProcessor.ProcessPeriodicComplete += this.OnProcessPeriodicComplete;
+            this.configProcessor.ProcessEventComplete += this.OnProcessorProcessEventComplete;
+            this.configProcessor.ProcessRowComplete += this.OnProcessRowComplete;
+            Task.Run(this.UpdateSessionInfo);
         }
 
         private void UpdateSessionInfo()
@@ -97,9 +95,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
             bool isComplete;
             do
             {
-                var sessionInfo = streamApiClient.GetSessionInfo(sessionKey);
+                var sessionInfo = this.streamApiClient.GetSessionInfo(this.sessionKey);
                 isComplete = sessionInfo.IsComplete;
-                var newStreams = sessionInfo.Streams.Where(x => !streamsOffsetDictionary.ContainsKey(x)).ToList();
+                var newStreams = sessionInfo.Streams.Where(x => !this.streamsOffsetDictionary.ContainsKey(x)).ToList();
                 if (newStreams.Any())
                 {
                     var connectionDetails = new ConnectionDetails
@@ -107,7 +105,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                         DataSource = sessionInfo.DataSource,
                         EssentialsOffset = sessionInfo.EssentialsOffset,
                         MainOffset = sessionInfo.MainOffset,
-                        Session = sessionKey,
+                        Session = this.sessionKey,
                         StreamOffsets =
                         {
                             newStreams.Select(x =>
@@ -116,8 +114,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
                         },
                         Streams = { newStreams }
                     };
-                    var connection = streamApiClient.GetNewConnectionToSession(connectionDetails);
-                    this.ReadPackets(cancellationTokenSource.Token, connection);
+                    var connection = this.streamApiClient.GetNewConnectionToSession(connectionDetails);
+                    this.ReadPackets(this.cancellationTokenSource.Token, connection);
                     this.connections.Add(connection);
                 }
                 this.UpdateSessionInfo(sessionInfo);
@@ -125,9 +123,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
             } while (!isComplete);
         }
 
-        public void ReadPackets(CancellationToken cancellationToken, Connection connectionDetails)
+        public void ReadPackets(CancellationToken cancellationToken, Connection? connectionDetails)
         {
-            var streamReader = CreateStream(connectionDetails)?.ResponseStream;
+            var streamReader = this.CreateStream(connectionDetails)?.ResponseStream;
 
             if (streamReader == null)
             {
@@ -142,7 +140,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                     while (await streamReader.MoveNext(cancellationToken))
                     {
                         var packetResponse = streamReader.Current;
-                        foreach (var response in packetResponse.Response) await HandleNewPacket(response.Packet);
+                        foreach (var response in packetResponse.Response) await this.HandleNewPacket(response.Packet);
                     }
                 }
                 catch (Exception ex)
@@ -156,7 +154,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
         {
             var packetType = packet.Type;
             var content = packet.Content;
-            _lastUpdated = DateTime.Now;
+            this.lastUpdated = DateTime.Now;
             try
             {
                 switch (packetType)
@@ -166,7 +164,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                             var periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
                             if (!this.periodicDataHandler.TryHandle(periodicDataPacket))
                             {
-                                periodicDataQueue.Enqueue(periodicDataPacket);
+                                this.periodicDataQueue.Enqueue(periodicDataPacket);
                             }
                             break;
                         }
@@ -175,7 +173,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                             var rowDataPacket = RowDataPacket.Parser.ParseFrom(content);
                             if (!this.rowDataHandler.TryHandle(rowDataPacket))
                             {
-                                rowDataQueue.Enqueue(rowDataPacket);
+                                this.rowDataQueue.Enqueue(rowDataPacket);
                             }
                             break;
                         }
@@ -190,7 +188,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                             var eventPacket = EventPacket.Parser.ParseFrom(content);
                             if (!this.eventDataHandler.TryHandle(eventPacket))
                             {
-                                eventPacketQueue.Enqueue(eventPacket);
+                                this.eventPacketQueue.Enqueue(eventPacket);
                             }
                             break;
                         }
@@ -209,29 +207,29 @@ namespace Stream.Api.Stream.Reader.SqlRace
             return Task.CompletedTask;
         }
         private AsyncServerStreamingCall<ReadPacketsResponse>? CreateStream(
-            Connection connectionDetails)
+            Connection? connectionDetails)
         {
-            return streamApiClient.CreateReadPacketsStream(connectionDetails);
+            return this.streamApiClient.CreateReadPacketsStream(connectionDetails);
         }
         private void OnProcessorProcessEventComplete(object? sender, EventArgs e)
         {
-            var dataQueue = eventPacketQueue.ToArray();
-            eventPacketQueue.Clear();
+            var dataQueue = this.eventPacketQueue.ToArray();
+            this.eventPacketQueue.Clear();
             foreach (var packet in dataQueue) this.eventDataHandler.TryHandle(packet);
         }
 
         private void OnProcessRowComplete(object? sender, EventArgs e)
         {
-            var dataQueue = rowDataQueue.ToArray();
-            rowDataQueue.Clear();
+            var dataQueue = this.rowDataQueue.ToArray();
+            this.rowDataQueue.Clear();
             foreach (var packet in dataQueue)
                 this.rowDataHandler.TryHandle(packet);
         }
 
         private void OnProcessPeriodicComplete(object? sender, EventArgs e)
         {
-            var dataQueue = periodicDataQueue.ToArray();
-            periodicDataQueue.Clear();
+            var dataQueue = this.periodicDataQueue.ToArray();
+            this.periodicDataQueue.Clear();
             foreach (var packet in dataQueue)
                 this.periodicDataHandler.TryHandle(packet);
         }

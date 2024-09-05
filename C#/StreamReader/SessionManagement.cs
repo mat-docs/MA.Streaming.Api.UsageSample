@@ -1,56 +1,60 @@
-﻿
+﻿// <copyright file="SessionManagement.cs" company="McLaren Applied Ltd.">
+// Copyright (c) McLaren Applied Ltd.</copyright>
 
+using Stream.Api.Stream.Reader.Abstractions;
 using Stream.Api.Stream.Reader.EventArguments;
-using Stream.Api.Stream.Reader.Interfaces;
 using Stream.Api.Stream.Reader.SqlRace;
 
 namespace Stream.Api.Stream.Reader
 {
     internal class SessionManagement(StreamApiClient streamApiClient, AtlasSessionWriter atlasSessionWriter)
     {
-        private Dictionary<string, ISession> sessionKeyDictionary = new();
+        private readonly Dictionary<string, ISession> sessionKeyDictionary = [];
+
         public void GetLiveSessions()
         {
             if (streamApiClient.TryGetLiveSessions(out var sessionKeys))
             {
                 foreach (var sessionKey in sessionKeys)
                 {
-                    sessionKeyDictionary[sessionKey] = new SqlRaceSession(atlasSessionWriter, streamApiClient);
-                    sessionKeyDictionary[sessionKey].StartSession(sessionKey);
+                    this.sessionKeyDictionary[sessionKey] = new SqlRaceSession(atlasSessionWriter, streamApiClient);
+                    this.sessionKeyDictionary[sessionKey].StartSession(sessionKey);
                 }
             }
             else
             {
-                streamApiClient.SessionStart += OnSessionStart;
+                streamApiClient.SessionStart += this.OnSessionStart;
                 streamApiClient.SubscribeToStartSessionNotification();
             }
-            streamApiClient.SessionStop += OnSessionStop;
+
+            streamApiClient.SessionStop += this.OnSessionStop;
             streamApiClient.SubscribeToStopNotification();
         }
 
         public void CloseAllSessions()
         {
-            foreach (var session in sessionKeyDictionary)
+            foreach (var session in this.sessionKeyDictionary)
             {
                 if (session.Value.SessionEnded)
                 {
                     continue;
                 }
+
                 session.Value.EndSession();
-                sessionKeyDictionary.Remove(session.Key);
+                this.sessionKeyDictionary.Remove(session.Key);
             }
         }
 
         private void OnSessionStart(object? sender, SessionKeyEventArgs e)
         {
-            sessionKeyDictionary[e.SessionKey] = new SqlRaceSession(atlasSessionWriter, streamApiClient);
-            sessionKeyDictionary[e.SessionKey].StartSession(e.SessionKey);
+            this.sessionKeyDictionary[e.SessionKey] = new SqlRaceSession(atlasSessionWriter, streamApiClient);
+            this.sessionKeyDictionary[e.SessionKey].StartSession(e.SessionKey);
         }
 
         private void OnSessionStop(object? sender, SessionKeyEventArgs e)
         {
-            sessionKeyDictionary[e.SessionKey].EndSession();
-            sessionKeyDictionary.Remove(e.SessionKey);
+            this.sessionKeyDictionary[e.SessionKey].EndSession();
+            this.sessionKeyDictionary.Remove(e.SessionKey);
         }
     }
 }

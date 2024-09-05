@@ -5,8 +5,10 @@ namespace Stream.Api.Stream.Reader
 {
     internal class Config
     {
-        public string? dataSource;
-        public string? sqlRaceConnectionString;
-        public string? ipAddress;
+        public string DataSource { get; } = "Default";
+
+        public string SQLRaceConnectionString { get; } = "server=MCLA-F8ZLSQ3\\\\LOCAL;Initial Catalog=SQLRACE01_LOCAL;Trusted_Connection=True;";
+
+        public string IPAddress { get; } = "127.0.0.1:13579";
     }
 }

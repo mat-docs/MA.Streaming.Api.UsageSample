@@ -18,7 +18,7 @@ namespace Stream.Api.Stream.Reader.Handlers
         public bool TryHandle(PeriodicDataPacket packet)
         {
             var parameterList = packet.DataFormat.HasDataFormatIdentifier
-                ? GetParameterList(packet.DataFormat.DataFormatIdentifier)
+                ? this.GetParameterList(packet.DataFormat.DataFormatIdentifier)
                 : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
 
             var newParameters = parameterList
@@ -91,12 +91,12 @@ namespace Stream.Api.Stream.Reader.Handlers
 
         private RepeatedField<string> GetParameterList(ulong dataFormatId)
         {
-            if (parameterListDataFormatCache.TryGetValue(dataFormatId, out RepeatedField<string>? parameterList))
+            if (this.parameterListDataFormatCache.TryGetValue(dataFormatId, out RepeatedField<string>? parameterList))
                 return parameterList;
 
             parameterList = streamApiClient.GetParameterList(dataFormatId);
 
-            parameterListDataFormatCache[dataFormatId] = parameterList;
+            this.parameterListDataFormatCache[dataFormatId] = parameterList;
 
             return parameterList;
         }

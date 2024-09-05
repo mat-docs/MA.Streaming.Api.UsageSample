@@ -15,7 +15,7 @@ namespace Stream.Api.Stream.Reader.Handlers
         public bool TryHandle(EventPacket packet)
         {
             var eventIdentifier = packet.DataFormat.HasDataFormatIdentifier
-                ? GetEventIdentifier(packet.DataFormat.DataFormatIdentifier)
+                ? this.GetEventIdentifier(packet.DataFormat.DataFormatIdentifier)
                 : packet.DataFormat.EventIdentifier;
 
             if (!sessionWriter.IsEventExistInConfig(eventIdentifier, clientSession))
@@ -36,11 +36,11 @@ namespace Stream.Api.Stream.Reader.Handlers
         }
         private string GetEventIdentifier(ulong dataFormatId)
         {
-            if (eventIdentifierDataFormatCache.TryGetValue(dataFormatId, out var eventIdentifier))
+            if (this.eventIdentifierDataFormatCache.TryGetValue(dataFormatId, out var eventIdentifier))
                 return eventIdentifier;
 
             eventIdentifier = streamApiClient.GetEventId(dataFormatId);
-            eventIdentifierDataFormatCache[dataFormatId] = eventIdentifier;
+            this.eventIdentifierDataFormatCache[dataFormatId] = eventIdentifier;
 
             return eventIdentifier;
         }
