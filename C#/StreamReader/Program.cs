@@ -9,7 +9,7 @@ namespace Stream.Api.Stream.Reader
     internal class Program
     {
         /// <summary>
-        ///     This Sample code will read live sessions from the Stream API Server and convert them into CSVs.
+        ///     This Sample code will read live sessions from the Stream API Server and convert them into SQL Race Sessions.
         ///     It can be modified to push data from the Stream API to any other data storage.
         /// </summary>
         private static void Main()

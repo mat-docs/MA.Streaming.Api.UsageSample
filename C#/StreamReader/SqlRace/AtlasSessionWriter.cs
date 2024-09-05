@@ -2,6 +2,7 @@
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using Google.Protobuf.Collections;
@@ -117,6 +118,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
         public void AddBasicPeriodicParameterConfiguration(IClientSession clientSession,
             IReadOnlyList<Tuple<string, uint>> parameterIdentifiers)
         {
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+            Console.WriteLine($"Adding config for {parameterIdentifiers.Count} periodic parameters.");
             if (_configSetManager == null)
             {
                 return;
@@ -170,9 +174,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                 }
 
                 clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
-                Console.WriteLine(
-                    $"Successfully added configuration {configSetIdentifier} for {parameterIdentifiers.Count} parameters.");
-
+                
                 foreach (var parameter in channelsToAdd)
                 {
                     if (channelIdCache[clientSession.Session.Key].ChannelIdPeriodicParameterDictionary.TryGetValue(parameter.Key, out var intervals))
@@ -186,6 +188,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
                             { { parameter.Value.Item1, parameter.Value.Item2 } };
                     }
                 }
+                stopwatch.Stop();
+                Console.WriteLine(
+                    $"Successfully added configuration {configSetIdentifier} for {parameterIdentifiers.Count} periodic parameters. Time Taken: {stopwatch.ElapsedMilliseconds} ms.");
 
             }
             catch (ConfigurationSetAlreadyExistsException)
@@ -197,6 +202,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
         public void AddBasicRowParameterConfiguration(IClientSession clientSession,
             IReadOnlyList<string> parameterIdentifiers)
         {
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+            Console.WriteLine($"Adding config for {parameterIdentifiers.Count} row parameters.");
             if (_configSetManager == null)
             {
                 return;
@@ -252,12 +260,13 @@ namespace Stream.Api.Stream.Reader.SqlRace
                 }
 
                 clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
-                Console.WriteLine(
-                    $"Successfully added configuration {configSetIdentifier} for {parameterIdentifiers.Count} parameters.");
 
                 foreach (var parameter in channelsToAdd)
                     channelIdCache[clientSession.Session.Key].ChannelIdRowParameterDictionary[parameter.Key] =
                         parameter.Value;
+                stopwatch.Stop();
+                Console.WriteLine(
+                    $"Successfully added configuration {configSetIdentifier} for {parameterIdentifiers.Count} row parameters. Time taken: {stopwatch.ElapsedMilliseconds} ms.");
             }
             catch (ConfigurationSetAlreadyExistsException)
             {
@@ -267,6 +276,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
 
         public void AddBasicEventConfiguration(IClientSession clientSession, IReadOnlyList<string> eventIdentifiers)
         {
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+            Console.WriteLine($"Adding config for {eventIdentifiers.Count} events.");   
             if (_configSetManager == null)
             {
                 return;
@@ -310,9 +322,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
                 clientSession.Session.UseLoggingConfigurationSet(config.Identifier);
 
                 foreach (var events in eventsToAdd) channelIdCache[clientSession.Session.Key].EventDefCache[events.Key] = events.Value;
-
+                stopwatch.Stop();
                 Console.WriteLine(
-                    $"Successfully added configuration {configSetIdentifier} for {eventIdentifiers.Count} events");
+                    $"Successfully added configuration {configSetIdentifier} for {eventIdentifiers.Count} events. Time Taken: {stopwatch.ElapsedMilliseconds}.");
             }
             catch (ConfigurationSetAlreadyExistsException)
             {
@@ -435,6 +447,10 @@ namespace Stream.Api.Stream.Reader.SqlRace
 
         public void CloseSession(IClientSession clientSession)
         {
+            if (clientSession.Session == null)
+            {
+                return;
+            }
             var identifier = clientSession.Session.Identifier;
             clientSession.Session.EndData(); ;
             channelIdCache.TryRemove(clientSession.Session.Key, out var sessionConfig);

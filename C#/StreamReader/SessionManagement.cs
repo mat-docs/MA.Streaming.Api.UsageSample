@@ -11,10 +11,13 @@ namespace Stream.Api.Stream.Reader
         private Dictionary<string, ISession> sessionKeyDictionary = new();
         public void GetLiveSessions()
         {
-            if (streamApiClient.TryGetLiveSessions(out var sessionKey))
+            if (streamApiClient.TryGetLiveSessions(out var sessionKeys))
             {
-                sessionKeyDictionary[sessionKey] = new SqlRaceSession(atlasSessionWriter, streamApiClient);
-                sessionKeyDictionary[sessionKey].StartSession(sessionKey);
+                foreach (var sessionKey in sessionKeys)
+                {
+                    sessionKeyDictionary[sessionKey] = new SqlRaceSession(atlasSessionWriter, streamApiClient);
+                    sessionKeyDictionary[sessionKey].StartSession(sessionKey);
+                }
             }
             else
             {

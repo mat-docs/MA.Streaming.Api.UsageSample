@@ -9,7 +9,7 @@ using Stream.Api.Stream.Reader.EventArguments;
 using Stream.Api.Stream.Reader.Handlers;
 namespace Stream.Api.Stream.Reader
 {
-    // This is the Stream API client that manages the sessions based off the calls given by the Stream API server.
+    // This is the Stream API client that manages the communications between the program and the Stream API server.
     internal class StreamApiClient
     {
 
@@ -19,8 +19,8 @@ namespace Stream.Api.Stream.Reader
         private DataFormatManagerService.DataFormatManagerServiceClient? dataFormatManagerServiceClient;
         private readonly string? dataSource;
 
-        private SessionStartHandler sessionStartHandler;
-        private SessionStopHandler sessionStopHandler;
+        private SessionStartHandler? sessionStartHandler;
+        private SessionStopHandler? sessionStopHandler;
         public EventHandler<SessionKeyEventArgs>? SessionStart;
         public EventHandler<SessionKeyEventArgs>? SessionStop;
 
@@ -51,28 +51,35 @@ namespace Stream.Api.Stream.Reader
         /// </summary>
         /// <param name="dataSource"></param>
         /// <returns>True if a live session is found. Otherwise, it's False.</returns>
-        public bool TryGetLiveSessions(out string? sessionKey)
+        public bool TryGetLiveSessions(out List<string> sessionKey)
         {
             var foundLiveSession = false;
+            sessionKey = new List<string>();
             try
             {
                 var currentSessionsResponse =
-                    sessionManagementServiceClient.GetCurrentSessions(new GetCurrentSessionsRequest()
+                    sessionManagementServiceClient?.GetCurrentSessions(new GetCurrentSessionsRequest()
                         { DataSource = dataSource });
-                sessionKey = null;
+                
+
+                if (currentSessionsResponse == null)
+                {
+                    return false;
+                }
+
                 foreach (var session in currentSessionsResponse.SessionKeys.Reverse())
                 {
                     var sessionInfoResponse = this.GetSessionInfo(session);
+                    if (sessionInfoResponse == null) continue;
                     if (sessionInfoResponse.IsComplete) continue;
                     Console.WriteLine($"Found Live session {sessionInfoResponse.Identifier}.");
                     foundLiveSession = true;
-                    sessionKey = session;
+                    sessionKey.Add(session);
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Unable to get any current sessions due to {ex.Message}");
-                sessionKey = null;
                 return false;
             }
             

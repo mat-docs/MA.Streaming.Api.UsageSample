@@ -47,8 +47,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
 
         public void AddPeriodicPacketParameter(Tuple<string, uint> parameter)
         {
-            if (_eventsAndParametersProcessed.Contains(parameter.Item1 + "Periodic" + parameter.Item2)) return;
-            _eventsAndParametersProcessed.Add(parameter.Item1 + "Periodic" + parameter.Item2);
+            if (_eventsAndParametersProcessed.Contains(parameter.Item1 + parameter.Item2)) return;
+            _eventsAndParametersProcessed.Add(parameter.Item1 + parameter.Item2);
             _periodicConfigProcessor.Add(parameter);
         }
 

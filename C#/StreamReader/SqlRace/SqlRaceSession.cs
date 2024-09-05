@@ -51,10 +51,13 @@ namespace Stream.Api.Stream.Reader.SqlRace
             do
             {
                 Task.Delay(1000).Wait();
-            } while (DateTime.Now - _lastUpdated < TimeSpan.FromSeconds(60));
+            } while (DateTime.Now - _lastUpdated < TimeSpan.FromSeconds(120));
 
             sessionWriter.CloseSession(_clientSession);
             connections.ForEach(x => streamApiClient.TryCloseConnection(x));
+            configProcessor.ProcessPeriodicComplete -= OnProcessPeriodicComplete;
+            configProcessor.ProcessEventComplete -= OnProcessorProcessEventComplete;
+            configProcessor.ProcessRowComplete -= OnProcessRowComplete;
             this.SessionEnded = true;
         }
 
@@ -230,7 +233,6 @@ namespace Stream.Api.Stream.Reader.SqlRace
             var dataQueue = periodicDataQueue.ToArray();
             periodicDataQueue.Clear();
             foreach (var packet in dataQueue)
-                //HandlePeriodicPacket(packet);
                 this.periodicDataHandler.TryHandle(packet);
         }
     }
