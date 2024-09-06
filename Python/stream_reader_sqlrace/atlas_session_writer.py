@@ -406,7 +406,7 @@ class AtlasSessionWriter:
             event_definition_id = time.time_ns()//2**31
 
             event_definition = open_data_pb2.EventDefinition(
-                identifier=event_identifier.split(":")[0],
+                identifier=event_identifier,
                 name=event_identifier.split(":")[0],
                 application_name=get_app_from_identifier(event_identifier),
                 description=event_identifier.split(":")[0],
