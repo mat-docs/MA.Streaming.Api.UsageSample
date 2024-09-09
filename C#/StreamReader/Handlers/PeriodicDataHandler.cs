@@ -1,20 +1,44 @@
-﻿
-using System.Collections.Concurrent;
-using Google.Protobuf.Collections;
-using MA.Streaming.OpenData;
-using MESL.SqlRace.Domain;
-using Stream.Api.Stream.Reader.SqlRace;
+﻿// <copyright file="PeriodicDataHandler.cs" company="McLaren Applied Ltd.">
+// Copyright (c) McLaren Applied Ltd.</copyright>
 
+using System.Collections.Concurrent;
+
+using Google.Protobuf.Collections;
+
+using MA.Streaming.OpenData;
+
+using Stream.Api.Stream.Reader.Abstractions;
+using Stream.Api.Stream.Reader.SqlRace;
+using Stream.Api.Stream.Reader.SqlRace.Mappers;
+using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class PeriodicDataHandler(
-        AtlasSessionWriter sessionWriter, 
-        StreamApiClient streamApiClient, 
-        IClientSession clientSession, 
-        ConfigurationProcessor configProcessor)
+    public class PeriodicDataHandler
     {
-        private ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();
+        private readonly ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();
+        private readonly ConcurrentQueue<PeriodicDataPacket> periodicDataQueue = new();
+        private readonly ISqlRaceWriter sessionWriter;
+        private readonly StreamApiClient streamApiClient;
+        private readonly PeriodicConfigProcessor configProcessor;
+        private readonly SessionConfig sessionConfig;
+        private readonly PeriodicPacketToSqlRaceParameterMapper parameterMapper;
+
+        public PeriodicDataHandler(
+            ISqlRaceWriter sessionWriter,
+            StreamApiClient streamApiClient,
+            SessionConfig sessionConfig,
+            PeriodicConfigProcessor configProcessor,
+            PeriodicPacketToSqlRaceParameterMapper periodicMapper)
+        {
+            this.sessionWriter = sessionWriter;
+            this.streamApiClient = streamApiClient;
+            this.sessionConfig = sessionConfig;
+            this.configProcessor = configProcessor;
+            this.configProcessor.ProcessPeriodicComplete += this.OnProcessPeriodicComplete;
+            this.parameterMapper = periodicMapper;
+        }
+
         public bool TryHandle(PeriodicDataPacket packet)
         {
             var parameterList = packet.DataFormat.HasDataFormatIdentifier
@@ -22,83 +46,53 @@ namespace Stream.Api.Stream.Reader.Handlers
                 : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
 
             var newParameters = parameterList
-                .Where(x => !sessionWriter.IsParameterExistInConfig(x, packet.Interval, clientSession))
+                .Where(x => !this.sessionConfig.IsParameterExistInConfig(x, packet.Interval))
                 .ToList();
 
             if (newParameters.Any())
             {
                 // If the packet contains new parameters, put it in the list parameters to add to config and queue the packet to process later.
                 foreach (var parameter in newParameters)
-                    configProcessor.AddPeriodicPacketParameter(new Tuple<string, uint>(parameter, packet.Interval));
+                {
+                    this.configProcessor.AddPeriodicParameterToConfig(new Tuple<string, uint>(parameter, packet.Interval));
+                }
+
+                this.periodicDataQueue.Enqueue(packet);
                 return false;
             }
 
-            for (var i = 0; i < parameterList.Count; i++)
+            var mappedParameters = this.parameterMapper.MapParameter(packet, parameterList);
+            if (mappedParameters.All(this.sessionWriter.TryWrite))
             {
-                var parameterIdentifier = parameterList[i];
-                var column = packet.Columns[i];
-                switch (column.ListCase)
-                {
-                    case SampleColumn.ListOneofCase.DoubleSamples:
-                        {
-                            var samples = column.DoubleSamples.Samples.Select(x => x.Value).ToList();
-                            if (!sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                    samples, (long)packet.StartTime, packet.Interval))
-                            {
-                                return false;
-                            }
-
-                            break;
-                        }
-                    case SampleColumn.ListOneofCase.Int32Samples:
-                        {
-                            var samples = column.Int32Samples.Samples.Select(x => (double)x.Value).ToList();
-                            if (!sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                    samples, (long)packet.StartTime, packet.Interval))
-                            {
-                                return false;
-                            }
-
-                            break;
-                        }
-                    case SampleColumn.ListOneofCase.BoolSamples:
-                        {
-                            var samples = column.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0).ToList();
-                            if (!sessionWriter.TryAddPeriodicData(clientSession, parameterIdentifier,
-                                    samples, (long)packet.StartTime, packet.Interval))
-                            {
-                                return false;
-                            }
-
-                            break;
-                        }
-                    case SampleColumn.ListOneofCase.StringSamples:
-                        {
-                            Console.WriteLine($"Unable to decode String Parameter {parameterIdentifier}");
-                            continue;
-                        }
-                    case SampleColumn.ListOneofCase.None:
-                    default:
-                        {
-                            Console.WriteLine($"No data found for parameter {parameterIdentifier}.");
-                            continue;
-                        }
-                }
+                return true;
             }
 
-            return true;
+            this.periodicDataQueue.Enqueue(packet);
+            return false;
         }
 
         private RepeatedField<string> GetParameterList(ulong dataFormatId)
         {
             if (this.parameterListDataFormatCache.TryGetValue(dataFormatId, out RepeatedField<string>? parameterList))
+            {
                 return parameterList;
+            }
 
-            parameterList = streamApiClient.GetParameterList(dataFormatId);
+            parameterList = this.streamApiClient.GetParameterList(dataFormatId);
 
             this.parameterListDataFormatCache[dataFormatId] = parameterList;
 
             return parameterList;
+        }
+
+        private void OnProcessPeriodicComplete(object? sender, EventArgs e)
+        {
+            var dataQueue = this.periodicDataQueue.ToArray();
+            this.periodicDataQueue.Clear();
+            foreach (var packet in dataQueue)
+            {
+                this.TryHandle(packet);
+            }
         }
     }
 }

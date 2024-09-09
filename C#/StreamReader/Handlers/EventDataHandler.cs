@@ -1,48 +1,87 @@
-﻿using System.Collections.Concurrent;
-using MESL.SqlRace.Domain;
+﻿// <copyright file="EventDataHandler.cs" company="McLaren Applied Ltd.">
+// Copyright (c) McLaren Applied Ltd.</copyright>
+
+using System.Collections.Concurrent;
+
 using MA.Streaming.OpenData;
+
+using Stream.Api.Stream.Reader.Abstractions;
 using Stream.Api.Stream.Reader.SqlRace;
+using Stream.Api.Stream.Reader.SqlRace.Mappers;
+using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class EventDataHandler(
-        AtlasSessionWriter sessionWriter,
-        StreamApiClient streamApiClient,
-        IClientSession clientSession,
-        ConfigurationProcessor configProcessor)
+    public class EventDataHandler
     {
-        private ConcurrentDictionary<ulong, string> eventIdentifierDataFormatCache = new();
+        private readonly ConcurrentDictionary<ulong, string> eventIdentifierDataFormatCache = new();
+        private readonly ISqlRaceWriter sessionWriter;
+        private readonly StreamApiClient streamApiClient;
+        private readonly SessionConfig sessionConfig;
+        private readonly ConcurrentQueue<EventPacket> eventPacketQueue;
+        private readonly EventConfigProcessor configProcessor;
+        private readonly EventPacketToSqlRaceEventMapper eventMapper;
+
+        public EventDataHandler(
+            ISqlRaceWriter sessionWriter,
+            StreamApiClient streamApiClient,
+            SessionConfig sessionConfig,
+            EventConfigProcessor configProcessor,
+            EventPacketToSqlRaceEventMapper eventMapper)
+        {
+            this.sessionWriter = sessionWriter;
+            this.streamApiClient = streamApiClient;
+            this.sessionConfig = sessionConfig;
+            this.eventPacketQueue = [];
+            this.configProcessor = configProcessor;
+            this.configProcessor.ProcessEventComplete += this.OnProcessorProcessEventComplete;
+            this.eventMapper = eventMapper;
+        }
+
         public bool TryHandle(EventPacket packet)
         {
             var eventIdentifier = packet.DataFormat.HasDataFormatIdentifier
                 ? this.GetEventIdentifier(packet.DataFormat.DataFormatIdentifier)
                 : packet.DataFormat.EventIdentifier;
 
-            if (!sessionWriter.IsEventExistInConfig(eventIdentifier, clientSession))
+            if (!this.sessionConfig.IsEventExistInConfig(eventIdentifier))
             {
-                configProcessor.AddPacketEvent(eventIdentifier);
+                this.configProcessor.AddEventToConfig(eventIdentifier);
+                this.eventPacketQueue.Enqueue(packet);
                 return false;
             }
 
-            var timestamp = (long)packet.Timestamp;
-            var values = new List<double>();
-            values.AddRange(packet.RawValues);
-            if (sessionWriter.TryAddEvent(clientSession, eventIdentifier, timestamp, values))
+            var mappedEvent = this.eventMapper.MapEvent(packet, eventIdentifier);
+            if (this.sessionWriter.TryWrite(mappedEvent))
             {
                 return true;
             }
-            Console.WriteLine($"Failed to write event {eventIdentifier}.");
+
+            this.eventPacketQueue.Enqueue(packet);
             return false;
         }
+
         private string GetEventIdentifier(ulong dataFormatId)
         {
             if (this.eventIdentifierDataFormatCache.TryGetValue(dataFormatId, out var eventIdentifier))
+            {
                 return eventIdentifier;
+            }
 
-            eventIdentifier = streamApiClient.GetEventId(dataFormatId);
+            eventIdentifier = this.streamApiClient.GetEventId(dataFormatId);
             this.eventIdentifierDataFormatCache[dataFormatId] = eventIdentifier;
 
             return eventIdentifier;
+        }
+
+        private void OnProcessorProcessEventComplete(object? sender, EventArgs e)
+        {
+            var dataQueue = this.eventPacketQueue.ToArray();
+            this.eventPacketQueue.Clear();
+            foreach (var packet in dataQueue)
+            {
+                this.TryHandle(packet);
+            }
         }
     }
 }

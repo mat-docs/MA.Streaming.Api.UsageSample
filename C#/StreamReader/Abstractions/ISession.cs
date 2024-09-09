@@ -1,9 +1,13 @@
-﻿namespace Stream.Api.Stream.Reader.Abstractions
+﻿// <copyright file="ISession.cs" company="McLaren Applied Ltd.">
+// Copyright (c) McLaren Applied Ltd.</copyright>
+
+namespace Stream.Api.Stream.Reader.Abstractions;
+
+public interface ISession
 {
-    internal interface ISession
-    {
-        public bool SessionEnded { get; }
-        public void StartSession(string sessionKey);
-        public void EndSession();
-    }
+    bool SessionEnded { get; }
+
+    void EndSession();
+
+    void StartSession();
 }

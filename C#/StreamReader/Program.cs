@@ -34,17 +34,19 @@ namespace Stream.Api.Stream.Reader
             
             // adding run option fetch class 
             // applying the option 
-            var atlasSessionWriter = new AtlasSessionWriter(config.SQLRaceConnectionString);
+            SqlRaceInitialiser.Initialise();
+            var recorder = new SqlRaceRecorder(config.SQLRaceConnectionString);
             var streamApiClient = new StreamApiClient(config);
-            var sessionManager = new SessionManagement(streamApiClient, atlasSessionWriter);
-            atlasSessionWriter.Initialise();
+            var sessionManager = new SessionManagement(streamApiClient, config);
+            recorder.StartRecorder();
             streamApiClient.Initialise();
             sessionManager.GetLiveSessions();
 
             Console.WriteLine("Press Enter to exit application.");
             Console.ReadLine();
             sessionManager.CloseAllSessions();
-            atlasSessionWriter.StopRecorderAndServer();
+            recorder.StopRecorder();
+            SqlRaceInitialiser.Shutdown();
         }
     }
 }

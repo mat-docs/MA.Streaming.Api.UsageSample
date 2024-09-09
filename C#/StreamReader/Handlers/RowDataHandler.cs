@@ -1,20 +1,43 @@
-﻿
+﻿// <copyright file="RowDataHandler.cs" company="McLaren Applied Ltd.">
+// Copyright (c) McLaren Applied Ltd.</copyright>
 
 using System.Collections.Concurrent;
+
 using Google.Protobuf.Collections;
+
 using MA.Streaming.OpenData;
-using MESL.SqlRace.Domain;
+
+using Stream.Api.Stream.Reader.Abstractions;
 using Stream.Api.Stream.Reader.SqlRace;
+using Stream.Api.Stream.Reader.SqlRace.Mappers;
+using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class RowDataHandler(
-        AtlasSessionWriter sessionWriter,
-        StreamApiClient streamApiClient,
-        IClientSession clientSession,
-        ConfigurationProcessor configProcessor)
+    public class RowDataHandler
     {
-        private ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();
+        private readonly ConcurrentQueue<RowDataPacket> rowDataQueue = new();
+        private readonly ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();
+        private readonly ISqlRaceWriter sessionWriter;
+        private readonly StreamApiClient streamApiClient;
+        private readonly SessionConfig sessionConfig;
+        private readonly RowConfigProcessor configProcessor;
+        private readonly RowPacketToSqlRaceParameterMapper rowMapper;
+
+        public RowDataHandler(
+            ISqlRaceWriter sessionWriter,
+            StreamApiClient streamApiClient,
+            SessionConfig sessionConfig,
+            RowConfigProcessor configProcessor,
+            RowPacketToSqlRaceParameterMapper rowMapper)
+        {
+            this.sessionWriter = sessionWriter;
+            this.streamApiClient = streamApiClient;
+            this.sessionConfig = sessionConfig;
+            this.configProcessor = configProcessor;
+            this.configProcessor.ProcessRowComplete += this.OnProcessRowComplete;
+            this.rowMapper = rowMapper;
+        }
 
         public bool TryHandle(RowDataPacket packet)
         {
@@ -32,80 +55,49 @@ namespace Stream.Api.Stream.Reader.Handlers
             }
 
             var newParameters = parameterList
-                .Where(x => !sessionWriter.IsParameterExistInConfig(x, clientSession))
+                .Where(x => !this.sessionConfig.IsParameterExistInConfig(x))
                 .ToList();
 
             if (newParameters.Any())
             {
                 // If the packet contains new parameters, put it in the parameter list to add to config and queue the packet to process later.
-                configProcessor.AddRowPacketParameter(newParameters);
+                this.configProcessor.AddParameterToConfig(newParameters);
+                this.rowDataQueue.Enqueue(packet);
                 return false;
             }
 
-            for (var i = 0; i < packet.Rows.Count; i++)
+            var mappedParameters = this.rowMapper.MapParameter(packet, parameterList);
+            if (mappedParameters.All(this.sessionWriter.TryWrite))
             {
-                var row = packet.Rows[i];
-                var timestamp = (long)packet.Timestamps[i];
-
-                switch (row.ListCase)
-                {
-                    case SampleRow.ListOneofCase.DoubleSamples:
-                        {
-                            if (!sessionWriter.TryAddData(clientSession, parameterList,
-                                    row.DoubleSamples.Samples.Select(x => x.Value).ToList(), timestamp))
-                            {
-                                return false;
-                            }
-
-                            break;
-                        }
-                    case SampleRow.ListOneofCase.Int32Samples:
-                        {
-                            if (!sessionWriter.TryAddData(clientSession, parameterList,
-                                    row.Int32Samples.Samples.Select(x => (double)x.Value).ToList(), timestamp))
-                            {
-                                return false;
-                            }
-                            
-                            break;
-                        }
-                    case SampleRow.ListOneofCase.BoolSamples:
-                        {
-                            if (!sessionWriter.TryAddData(clientSession, parameterList,
-                                    row.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0).ToList(), timestamp))
-                            {
-                                return false;
-                            }
-                            
-                            break;
-                        }
-                    case SampleRow.ListOneofCase.StringSamples:
-                        {
-                            Console.WriteLine("Unable to add String data for this row.");
-                            continue;
-                        }
-                    case SampleRow.ListOneofCase.None:
-                    default:
-                        {
-                            Console.WriteLine("No rows found for this packet.");
-                            continue;
-                        }
-                }
+                return true;
             }
 
-            return true;
+            this.rowDataQueue.Enqueue(packet);
+            return false;
         }
 
         private RepeatedField<string> GetParameterList(ulong dataFormatId)
         {
             if (this.parameterListDataFormatCache.TryGetValue(dataFormatId, out RepeatedField<string>? parameterList))
+            {
                 return parameterList;
+            }
 
-            parameterList = streamApiClient.GetParameterList(dataFormatId);
+            parameterList = this.streamApiClient.GetParameterList(dataFormatId);
 
             this.parameterListDataFormatCache[dataFormatId] = parameterList;
 
             return parameterList;
+        }
+
+        private void OnProcessRowComplete(object? sender, EventArgs e)
+        {
+            var dataQueue = this.rowDataQueue.ToArray();
+            this.rowDataQueue.Clear();
+            foreach (var packet in dataQueue)
+            {
+                this.TryHandle(packet);
+            }
         }
     }
 }

@@ -7,7 +7,7 @@ using Stream.Api.Stream.Reader.SqlRace;
 
 namespace Stream.Api.Stream.Reader
 {
-    internal class SessionManagement(StreamApiClient streamApiClient, AtlasSessionWriter atlasSessionWriter)
+    internal class SessionManagement(StreamApiClient streamApiClient, Config config)
     {
         private readonly Dictionary<string, ISession> sessionKeyDictionary = [];
 
@@ -17,8 +17,8 @@ namespace Stream.Api.Stream.Reader
             {
                 foreach (var sessionKey in sessionKeys)
                 {
-                    this.sessionKeyDictionary[sessionKey] = new SqlRaceSession(atlasSessionWriter, streamApiClient);
-                    this.sessionKeyDictionary[sessionKey].StartSession(sessionKey);
+                    Console.WriteLine($"New Live SqlRaceSession found with key {sessionKey}.");
+                    this.CreateAndStartSession(sessionKey);
                 }
             }
             else
@@ -33,22 +33,25 @@ namespace Stream.Api.Stream.Reader
 
         public void CloseAllSessions()
         {
-            foreach (var session in this.sessionKeyDictionary)
+            foreach (var session in this.sessionKeyDictionary.Where(session => !session.Value.SessionEnded))
             {
-                if (session.Value.SessionEnded)
-                {
-                    continue;
-                }
-
                 session.Value.EndSession();
                 this.sessionKeyDictionary.Remove(session.Key);
             }
         }
 
+        public void CreateAndStartSession(string sessionKey)
+        {
+            var sessionInfo = streamApiClient.GetSessionInfo(sessionKey);
+            this.sessionKeyDictionary[sessionKey] = SqlRaceSessionFactory.CreateSession(sessionInfo, streamApiClient, config.SQLRaceConnectionString, sessionKey);
+            this.sessionKeyDictionary[sessionKey].StartSession();
+        }
+
         private void OnSessionStart(object? sender, SessionKeyEventArgs e)
         {
-            this.sessionKeyDictionary[e.SessionKey] = new SqlRaceSession(atlasSessionWriter, streamApiClient);
-            this.sessionKeyDictionary[e.SessionKey].StartSession(e.SessionKey);
+            Console.WriteLine($"New Live SqlRaceSession found with key {e.SessionKey}.");
+            this.CreateAndStartSession(e.SessionKey);
+            this.sessionKeyDictionary[e.SessionKey].StartSession();
         }
 
         private void OnSessionStop(object? sender, SessionKeyEventArgs e)

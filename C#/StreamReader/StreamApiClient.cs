@@ -14,7 +14,7 @@ using Stream.Api.Stream.Reader.Handlers;
 namespace Stream.Api.Stream.Reader
 {
     // This is the Stream API client that manages the communications between the program and the Stream API server.
-    internal class StreamApiClient
+    public class StreamApiClient
     {
         private readonly Config config;
         private readonly SessionStartHandler sessionStartHandler;

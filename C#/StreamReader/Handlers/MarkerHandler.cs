@@ -1,23 +1,19 @@
-﻿using MESL.SqlRace.Domain;
+﻿// <copyright file="MarkerHandler.cs" company="McLaren Applied Ltd.">
+// Copyright (c) McLaren Applied Ltd.</copyright>
+
 using MA.Streaming.OpenData;
-using Stream.Api.Stream.Reader.SqlRace;
+
+using Stream.Api.Stream.Reader.Abstractions;
+using Stream.Api.Stream.Reader.SqlRace.Mappers;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class MarkerHandler(
-        AtlasSessionWriter sessionWriter,
-        StreamApiClient streamApiClient,
-        IClientSession clientSession
-        )
+    public class MarkerHandler(ISqlRaceWriter sessionWriter)
     {
         public bool TryHandle(MarkerPacket packet)
         {
-            var timestamp = (long)packet.Timestamp;
-            if (packet.Type == "Lap Trigger")
-                sessionWriter.AddLap(clientSession, timestamp, (short)packet.Value, packet.Label, true);
-            else
-                sessionWriter.AddMarker(clientSession, timestamp, packet.Label);
-            return true;
+            var mappedMarker = MarkerPacketToSqlRaceMarkerMapper.MapMarker(packet);
+            return sessionWriter.TryWrite(mappedMarker);
         }
     }
 }
