@@ -12,7 +12,6 @@ namespace Stream.Api.Stream.Reader.SqlRace
     {
         private readonly object configLock;
 
-        private readonly IClientSession clientSession;
         private readonly ISqlRaceWriter eventSqlRaceWriter;
         private readonly ISqlRaceWriter periodicSqlRaceWriter;
         private readonly ISqlRaceWriter rowSqlRaceWriter;
@@ -21,7 +20,6 @@ namespace Stream.Api.Stream.Reader.SqlRace
         private readonly ISqlRaceWriter sessionInfoWriter;
 
         public SqlRaceWriter(
-            IClientSession clientSession,
             object configLock,
             ISqlRaceWriter eventSqlRaceWriter,
             ISqlRaceWriter periodicSqlRaceWriter,
@@ -31,7 +29,6 @@ namespace Stream.Api.Stream.Reader.SqlRace
             ISqlRaceWriter sessionInfoWriter)
         {
             this.configLock = configLock;
-            this.clientSession = clientSession;
             this.eventSqlRaceWriter = eventSqlRaceWriter;
             this.periodicSqlRaceWriter = periodicSqlRaceWriter;
             this.rowSqlRaceWriter = rowSqlRaceWriter;

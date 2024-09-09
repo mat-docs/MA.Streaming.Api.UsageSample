@@ -36,7 +36,6 @@ namespace Stream.Api.Stream.Reader.SqlRace
             var configLock = new object();
             var sessionConfig = new SessionConfig();
             var sessionWriter = new SqlRaceWriter(
-                clientSession,
                 configLock,
                 new EventSqlRaceWriter(clientSession),
                 new PeriodicSqlRaceWriter(clientSession),
