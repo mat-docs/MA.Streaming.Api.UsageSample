@@ -13,7 +13,8 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
         {
             this.ClientSession = clientSession;
         }
-        protected IClientSession ClientSession { get; set; }
+
+        protected IClientSession ClientSession { get; }
 
         public abstract bool TryWrite(ISqlRaceDto data);
     }
