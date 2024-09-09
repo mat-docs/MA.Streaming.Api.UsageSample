@@ -1,0 +1,5 @@
+{
+    "ipAddress": "127.0.0.1:13579",
+    "dataSource": "Default",
+    "sqlRaceConnectionString": "server=MCLA-F8ZLSQ3\\LOCAL;Initial Catalog=SQLRACE01_LOCAL;Trusted_Connection=True;"
+}

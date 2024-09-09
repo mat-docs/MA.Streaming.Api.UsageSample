@@ -9,6 +9,7 @@
 *.user
 *.userosscache
 *.sln.docstates
+*.DotSettings
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -364,3 +365,6 @@ FodyWeavers.xsd
 
 # gRPC Compiled Python Files
 Python/ma
+/Python/.idea
+/Python/proto
+/Python/streaming
