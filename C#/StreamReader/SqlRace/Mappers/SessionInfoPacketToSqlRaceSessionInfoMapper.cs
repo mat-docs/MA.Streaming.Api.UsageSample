@@ -8,14 +8,11 @@ using Stream.Api.Stream.Reader.Dto;
 
 namespace Stream.Api.Stream.Reader.SqlRace.Mappers
 {
-    public class SessionInfoPacketToSqlRaceSessionInfoMapper : BaseMapper
+    internal class SessionInfoPacketToSqlRaceSessionInfoMapper
     {
         public static ISqlRaceDto MapSessionInfo(GetSessionInfoResponse packet)
         {
-            return new SqlRaceSessionInfoDto
-            {
-                SessionIdentifier = packet.Identifier == "" ? "Untitled" : packet.Identifier
-            };
+            return new SqlRaceSessionInfoDto(packet.Identifier == "" ? "Untitled" : packet.Identifier);
         }
     }
 }

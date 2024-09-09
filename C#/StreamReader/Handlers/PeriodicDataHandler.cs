@@ -14,7 +14,7 @@ using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    public class PeriodicDataHandler
+    internal class PeriodicDataHandler
     {
         private readonly ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();
         private readonly ConcurrentQueue<PeriodicDataPacket> periodicDataQueue = new();

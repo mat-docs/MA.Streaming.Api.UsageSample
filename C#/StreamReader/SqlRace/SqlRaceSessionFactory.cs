@@ -16,7 +16,7 @@ using ISession = Stream.Api.Stream.Reader.Abstractions.ISession;
 
 namespace Stream.Api.Stream.Reader.SqlRace
 {
-    public static class SqlRaceSessionFactory
+    internal static class SqlRaceSessionFactory
     {
         public static ISession CreateSession(GetSessionInfoResponse sessionInfo, StreamApiClient streamApiClient, string connectionString, string sessionKey)
         {
@@ -66,7 +66,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                     new EventPacketToSqlRaceEventMapper(sessionConfig)));
 
             Console.WriteLine($"New SqlRaceSession is created with name {sessionName}.");
-            return new SqlRaceSession(streamApiClient, clientSession, sessionKey, sessionConfig, sessionWriter, packetHandler);
+            return new SqlRaceSession(streamApiClient, clientSession, sessionKey, sessionWriter, packetHandler);
         }
     }
 }

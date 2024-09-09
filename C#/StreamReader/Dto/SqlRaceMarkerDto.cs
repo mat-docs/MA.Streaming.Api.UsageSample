@@ -7,10 +7,17 @@ namespace Stream.Api.Stream.Reader.Dto
 {
     public class SqlRaceMarkerDto : ISqlRaceDto, ISqlRaceMarkerDto
     {
-        public string DataType { get; } = "Marker";
+        public SqlRaceMarkerDto(string name, long timestamp)
+        {
+            this.Name = name;
+            this.Timestamp = timestamp;
+            this.DataType = "Marker";
+        }
 
-        public string Name { get; set; }
+        public string DataType { get; }
 
-        public long Timestamp { get; set; }
+        public string Name { get; }
+
+        public long Timestamp { get; }
     }
 }

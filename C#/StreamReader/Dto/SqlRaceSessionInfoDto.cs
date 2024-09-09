@@ -7,8 +7,14 @@ namespace Stream.Api.Stream.Reader.Dto
 {
     public class SqlRaceSessionInfoDto : ISqlRaceDto, ISqlRaceSessionInfoDto
     {
-        public string DataType { get; } = "Session Info";
+        public SqlRaceSessionInfoDto(string sessionIdentifier)
+        {
+            this.SessionIdentifier = sessionIdentifier;
+            this.DataType = "Session Info";
+        }
 
-        public string SessionIdentifier { get; set; }
+        public string DataType { get; }
+
+        public string SessionIdentifier { get; }
     }
 }

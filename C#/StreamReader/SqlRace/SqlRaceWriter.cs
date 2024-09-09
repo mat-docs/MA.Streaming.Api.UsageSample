@@ -1,8 +1,6 @@
 ﻿// <copyright file="SqlRaceWriter.cs" company="McLaren Applied Ltd.">
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
-using MA.Streaming.API;
-
 using MESL.SqlRace.Domain;
 
 using Stream.Api.Stream.Reader.Abstractions;

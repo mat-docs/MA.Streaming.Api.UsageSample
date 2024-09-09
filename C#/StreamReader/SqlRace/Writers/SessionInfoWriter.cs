@@ -7,11 +7,11 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.SqlRace.Writers
 {
-    public class SessionInfoWriter : BaseSqlRaceWriter
+    internal class SessionInfoWriter : BaseSqlRaceWriter
     {
         public SessionInfoWriter(IClientSession clientSession)
+            : base(clientSession)
         {
-            this.ClientSession = clientSession;
         }
 
         public override bool TryWrite(ISqlRaceDto data)

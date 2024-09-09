@@ -9,10 +9,10 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.StreamApiReader
 {
-    public class StreamApiReader : IStreamApiReader
+    internal class StreamApiReader : IStreamApiReader
     {
         private readonly Connection connection;
-        private readonly CancellationTokenSource tokenSource;
+        private readonly CancellationTokenSource tokenSource = new CancellationTokenSource();
         private readonly IPacketHandler packetHandler;
         private readonly StreamApiClient streamApiClient;
         private DateTime lastUpdated;
@@ -20,7 +20,6 @@ namespace Stream.Api.Stream.Reader.StreamApiReader
         public StreamApiReader(Connection connection, IPacketHandler packetHandler, StreamApiClient streamApiClient)
         {
             this.connection = connection;
-            this.tokenSource = new CancellationTokenSource();
             this.packetHandler = packetHandler;
             this.streamApiClient = streamApiClient;
             this.lastUpdated = DateTime.Now;
@@ -33,7 +32,6 @@ namespace Stream.Api.Stream.Reader.StreamApiReader
 
         public void Stop()
         {
-            // Wait for reading from stream to end.
             do
             {
                 Task.Delay(1000).Wait();
@@ -58,13 +56,15 @@ namespace Stream.Api.Stream.Reader.StreamApiReader
                     try
                     {
                         while (!cancellationToken.IsCancellationRequested)
-                        while (await streamReader.MoveNext(cancellationToken))
                         {
-                            var packetResponse = streamReader.Current;
-                            foreach (var response in packetResponse.Response)
+                            while (await streamReader.MoveNext(cancellationToken))
                             {
-                                this.packetHandler.Handle(response.Packet);
-                                this.lastUpdated = DateTime.Now;
+                                var packetResponse = streamReader.Current;
+                                foreach (var response in packetResponse.Response)
+                                {
+                                    this.packetHandler.Handle(response.Packet);
+                                    this.lastUpdated = DateTime.Now;
+                                }
                             }
                         }
                     }

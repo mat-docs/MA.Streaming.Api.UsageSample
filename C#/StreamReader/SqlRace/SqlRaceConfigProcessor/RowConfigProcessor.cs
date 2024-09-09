@@ -11,7 +11,7 @@ using MESL.SqlRace.Enumerators;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    public class RowConfigProcessor : BaseConfigProcessor
+    internal class RowConfigProcessor : BaseConfigProcessor
     {
         private readonly TimeAndSizeWindowBatchProcessor<List<string>> rowConfigProcessor;
         private readonly ConcurrentBag<string> parametersProcessed;

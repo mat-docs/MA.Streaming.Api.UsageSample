@@ -31,7 +31,7 @@ namespace Stream.Api.Stream.Reader
 
             Console.WriteLine("To start press enter");
             Console.ReadLine();
-            
+
             // adding run option fetch class 
             // applying the option 
             SqlRaceInitialiser.Initialise();

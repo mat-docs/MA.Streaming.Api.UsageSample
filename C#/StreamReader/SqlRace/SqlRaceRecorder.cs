@@ -7,7 +7,7 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.SqlRace
 {
-    public class SqlRaceRecorder : ISqlRaceRecorder
+    internal class SqlRaceRecorder : ISqlRaceRecorder
     {
         private readonly string connectionString;
         private readonly Guid recorderGuid;

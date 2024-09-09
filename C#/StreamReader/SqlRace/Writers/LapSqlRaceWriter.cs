@@ -7,11 +7,10 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.SqlRace.Writers
 {
-    public class LapSqlRaceWriter : BaseSqlRaceWriter
+    internal class LapSqlRaceWriter : BaseSqlRaceWriter
     {
-        public LapSqlRaceWriter(IClientSession clientSession)
+        public LapSqlRaceWriter(IClientSession clientSession) : base(clientSession)
         {
-            this.ClientSession = clientSession;
         }
 
         public override bool TryWrite(ISqlRaceDto data)
@@ -23,6 +22,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
                 // Drop the lap as its already in the session.
                 return true;
             }
+
             try
             {
                 this.ClientSession.Session.LapCollection.Add(lap);

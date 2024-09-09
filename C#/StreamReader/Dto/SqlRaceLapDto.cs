@@ -7,16 +7,26 @@ namespace Stream.Api.Stream.Reader.Dto
 {
     public class SqlRaceLapDto : ISqlRaceDto, ISqlRaceLapDto
     {
-        public string DataType { get; } = "Lap";
+        public SqlRaceLapDto(string name, short lapNumber, long timestamp, bool countForFastestLap, byte triggerSource)
+        {
+            this.Name = name;
+            this.LapNumber = lapNumber;
+            this.Timestamp = timestamp;
+            this.CountForFastestLap = countForFastestLap;
+            this.TriggerSource = triggerSource;
+            this.DataType = "Lap";
+        }
 
-        public string Name { get; set; }
+        public string DataType { get; }
 
-        public short LapNumber { get; set; }
+        public string Name { get; }
 
-        public long Timestamp { get; set; }
+        public short LapNumber { get; }
 
-        public bool CountForFastestLap { get; set; }
+        public long Timestamp { get; }
 
-        public byte TriggerSource { get; set; }
+        public bool CountForFastestLap { get; }
+
+        public byte TriggerSource { get; }
     }
 }

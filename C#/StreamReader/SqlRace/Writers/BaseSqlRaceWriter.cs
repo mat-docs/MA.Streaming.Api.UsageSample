@@ -7,9 +7,14 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.SqlRace.Writers
 {
-    public abstract class BaseSqlRaceWriter : ISqlRaceWriter
+    internal abstract class BaseSqlRaceWriter : ISqlRaceWriter
     {
-        protected IClientSession ClientSession { get; set; }
+        protected BaseSqlRaceWriter(IClientSession clientSession)
+        {
+            this.ClientSession = clientSession;
+        }
+
+        protected IClientSession ClientSession { get; }
 
         public abstract bool TryWrite(ISqlRaceDto data);
     }

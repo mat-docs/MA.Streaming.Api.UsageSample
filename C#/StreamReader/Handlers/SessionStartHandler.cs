@@ -25,20 +25,21 @@ namespace Stream.Api.Stream.Reader.Handlers
                     try
                     {
                         while (!cancellationToken.IsCancellationRequested)
-                        while (await startNotificationStream.MoveNext(cancellationToken))
                         {
-                            var notificationMessage = startNotificationStream.Current;
-                            this.NewSessionStart?.Invoke(
-                                this,
-                                new SessionKeyEventArgs
-                                {
-                                    SessionKey = notificationMessage.SessionKey
-                                });
+                            while (await startNotificationStream.MoveNext(cancellationToken))
+                            {
+                                var notificationMessage = startNotificationStream.Current;
+                                this.NewSessionStart?.Invoke(
+                                    this,
+                                    new SessionKeyEventArgs(notificationMessage.SessionKey));
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"Failed to Subscribe to Start Notification due to {ex.Message}");
+                        this.tokenSource.Cancel();
+                        this.tokenSource.Dispose();
                     }
                 },
                 cancellationToken);

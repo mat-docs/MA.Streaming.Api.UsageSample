@@ -5,7 +5,7 @@ using MESL.SqlRace.Domain;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    public class BaseConfigProcessor
+    internal class BaseConfigProcessor
     {
         protected ConfigurationSetManager ConfigurationSetManager;
         protected RationalConversion DefaultConversion;
