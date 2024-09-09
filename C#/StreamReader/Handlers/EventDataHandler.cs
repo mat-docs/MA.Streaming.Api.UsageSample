@@ -12,7 +12,7 @@ using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    public class EventDataHandler
+    internal class EventDataHandler
     {
         private readonly ConcurrentDictionary<ulong, string> eventIdentifierDataFormatCache = new();
         private readonly ISqlRaceWriter sessionWriter;

@@ -7,14 +7,23 @@ namespace Stream.Api.Stream.Reader.Dto
 {
     public class SqlRaceRowDto : ISqlRaceParameterDto, ISqlRaceDto
     {
-        public string DataType { get; } = "Row";
+        public SqlRaceRowDto(IReadOnlyList<uint> channels, long timestamp, byte[] data, uint interval)
+        {
+            this.Channels = channels;
+            this.Timestamp = timestamp;
+            this.Data = data;
+            this.Interval = interval;
+            this.DataType = "Row";
+        }
 
-        public IReadOnlyList<uint> Channels { get; set; }
+        public string DataType { get; }
 
-        public long Timestamp { get; set; }
+        public IReadOnlyList<uint> Channels { get; }
 
-        public byte[] Data { get; set; }
+        public long Timestamp { get; }
 
-        public uint Interval { get; set; }
+        public byte[] Data { get; }
+
+        public uint Interval { get; }
     }
 }

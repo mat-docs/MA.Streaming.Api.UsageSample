@@ -26,7 +26,6 @@ namespace Stream.Api.Stream.Reader.SqlRace
             StreamApiClient streamApiClient,
             IClientSession clientSession,
             string sessionKey,
-            ISessionConfig sessionConfig,
             ISqlRaceWriter sqlRaceWriter,
             IPacketHandler packetHandler)
         {
@@ -103,6 +102,12 @@ namespace Stream.Api.Stream.Reader.SqlRace
                         }
                     };
                     var connection = this.streamApiClient.GetNewConnectionToSession(connectionDetails);
+                    if (connection == null)
+                    {
+                        Console.WriteLine("Connection is null");
+                        return;
+                    }
+
                     var streamApiReader = new StreamApiReader.StreamApiReader(connection, this.packetHandler, this.streamApiClient);
                     this.streamApiReaders.Add(streamApiReader);
                     streamApiReader.Start();

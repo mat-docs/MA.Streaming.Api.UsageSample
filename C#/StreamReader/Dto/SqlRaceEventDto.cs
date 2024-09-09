@@ -7,14 +7,23 @@ namespace Stream.Api.Stream.Reader.Dto
 {
     public class SqlRaceEventDto : ISqlRaceEventDto, ISqlRaceDto
     {
-        public string DataType { get; } = "Event";
+        public SqlRaceEventDto(int eventId, string groupName, long timestamp, IList<double> data)
+        {
+            this.EventId = eventId;
+            this.GroupName = groupName;
+            this.Timestamp = timestamp;
+            this.Data = data;
+            this.DataType = "Event";
+        }
 
-        public int EventId { get; set; }
+        public string DataType { get; }
 
-        public string GroupName { get; set; }
+        public int EventId { get; }
 
-        public long Timestamp { get; set; }
+        public string GroupName { get; }
 
-        public IList<double> Data { get; set; }
+        public long Timestamp { get; }
+
+        public IList<double> Data { get; }
     }
 }

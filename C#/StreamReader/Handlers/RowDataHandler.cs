@@ -14,7 +14,7 @@ using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    public class RowDataHandler
+    internal class RowDataHandler
     {
         private readonly ConcurrentQueue<RowDataPacket> rowDataQueue = new();
         private readonly ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();

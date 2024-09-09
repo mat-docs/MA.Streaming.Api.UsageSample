@@ -15,7 +15,7 @@ using EventDefinition = MESL.SqlRace.Domain.EventDefinition;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    public class EventConfigProcessor : BaseConfigProcessor
+    internal class EventConfigProcessor : BaseConfigProcessor
     {
         private readonly Dictionary<EventPriority, EventPriorityType> eventPriorityDictionary =
             new()

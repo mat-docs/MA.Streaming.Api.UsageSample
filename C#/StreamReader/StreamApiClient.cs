@@ -14,7 +14,7 @@ using Stream.Api.Stream.Reader.Handlers;
 namespace Stream.Api.Stream.Reader
 {
     // This is the Stream API client that manages the communications between the program and the Stream API server.
-    public class StreamApiClient
+    internal class StreamApiClient
     {
         private readonly Config config;
         private readonly SessionStartHandler sessionStartHandler;
@@ -24,8 +24,6 @@ namespace Stream.Api.Stream.Reader
         private SessionManagementService.SessionManagementServiceClient? sessionManagementServiceClient;
         private PacketReaderService.PacketReaderServiceClient? packetReaderServiceClient;
         private DataFormatManagerService.DataFormatManagerServiceClient? dataFormatManagerServiceClient;
-        public EventHandler<SessionKeyEventArgs>? SessionStart;
-        public EventHandler<SessionKeyEventArgs>? SessionStop;
 
         public StreamApiClient(Config config)
         {
@@ -33,6 +31,10 @@ namespace Stream.Api.Stream.Reader
             this.sessionStartHandler = new SessionStartHandler();
             this.sessionStopHandler = new SessionStopHandler();
         }
+
+        public event EventHandler<SessionKeyEventArgs>? SessionStart;
+
+        public event EventHandler<SessionKeyEventArgs>? SessionStop;
 
         /// <summary>
         ///     Initialises the Stream API clients based off the given IP Address.

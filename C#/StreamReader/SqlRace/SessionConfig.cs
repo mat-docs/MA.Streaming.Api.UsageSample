@@ -9,7 +9,7 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.SqlRace
 {
-    public class SessionConfig : ISessionConfig
+    internal class SessionConfig : ISessionConfig
     {
         private readonly ConcurrentDictionary<string, uint> channelIdRowParameterDictionary = new();
 

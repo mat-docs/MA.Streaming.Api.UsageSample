@@ -43,6 +43,12 @@ namespace Stream.Api.Stream.Reader
         public void CreateAndStartSession(string sessionKey)
         {
             var sessionInfo = streamApiClient.GetSessionInfo(sessionKey);
+            if (sessionInfo == null)
+            {
+                Console.WriteLine($"Can't find the session with key:{sessionKey}");
+                return;
+            }
+
             this.sessionKeyDictionary[sessionKey] = SqlRaceSessionFactory.CreateSession(sessionInfo, streamApiClient, config.SQLRaceConnectionString, sessionKey);
             this.sessionKeyDictionary[sessionKey].StartSession();
         }

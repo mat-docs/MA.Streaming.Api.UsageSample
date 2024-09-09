@@ -8,11 +8,11 @@ using Stream.Api.Stream.Reader.Dto;
 
 namespace Stream.Api.Stream.Reader.SqlRace.Writers
 {
-    public class EventSqlRaceWriter : BaseSqlRaceWriter
+    internal class EventSqlRaceWriter : BaseSqlRaceWriter
     {
         public EventSqlRaceWriter(IClientSession clientSession)
+            : base(clientSession)
         {
-            this.ClientSession = clientSession;
         }
 
         public override bool TryWrite(ISqlRaceDto data)

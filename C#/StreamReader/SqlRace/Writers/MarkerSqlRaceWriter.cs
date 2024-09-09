@@ -7,11 +7,10 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.SqlRace.Writers
 {
-    public class MarkerSqlRaceWriter : BaseSqlRaceWriter
+    internal class MarkerSqlRaceWriter : BaseSqlRaceWriter
     {
-        public MarkerSqlRaceWriter(IClientSession clientSession)
+        public MarkerSqlRaceWriter(IClientSession clientSession) : base(clientSession)
         {
-            this.ClientSession = clientSession;
         }
 
         public override bool TryWrite(ISqlRaceDto data)
@@ -23,6 +22,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
                 // Drop the marker if the same marker has already been added.
                 return true;
             }
+
             try
             {
                 this.ClientSession.Session.Markers.Add(marker);

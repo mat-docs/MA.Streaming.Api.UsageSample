@@ -3,15 +3,18 @@
 
 namespace Stream.Api.Stream.Reader.SqlRace.Mappers
 {
-    public class BaseMapper
+    internal abstract class BaseMapper
     {
-        private const long NumberOfNanosecondsInDay = 86400000000000;
+        protected BaseMapper(SessionConfig sessionConfig)
+        {
+            this.SessionConfig = sessionConfig;
+        }
 
-        protected SessionConfig SessionConfig { get; set; }
+        protected SessionConfig SessionConfig { get; }
 
         public static long ConvertUnixToSqlRaceTime(ulong unixTime)
         {
-            return (long)unixTime % NumberOfNanosecondsInDay;
+            return unixTime.ToSqlRaceTime();
         }
     }
 }

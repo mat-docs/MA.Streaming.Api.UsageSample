@@ -8,11 +8,11 @@ using Stream.Api.Stream.Reader.Dto;
 
 namespace Stream.Api.Stream.Reader.SqlRace.Mappers
 {
-    public class RowPacketToSqlRaceParameterMapper : BaseMapper
+    internal class RowPacketToSqlRaceParameterMapper : BaseMapper
     {
         public RowPacketToSqlRaceParameterMapper(SessionConfig sessionConfig)
+            : base(sessionConfig)
         {
-            this.SessionConfig = sessionConfig;
         }
 
         public IReadOnlyList<ISqlRaceDto> MapParameter(RowDataPacket packet, IReadOnlyList<string> parameterList)
@@ -21,24 +21,23 @@ namespace Stream.Api.Stream.Reader.SqlRace.Mappers
             var channels = parameterList.Select(this.SessionConfig.GetParameterChannelId).ToList();
             for (var i = 0; i < packet.Rows.Count; i++)
             {
-                var samples = new List<double>();
                 var row = packet.Rows[i];
                 var timestamp = packet.Timestamps[i];
                 switch (row.ListCase)
                 {
                     case SampleRow.ListOneofCase.DoubleSamples:
                     {
-                        samples = row.DoubleSamples.Samples.Select(x => x.Value).ToList();
+                        mappedParameters.Add(this.CreateSqlRowDto(channels, row.DoubleSamples.Samples.Select(x => x.Value), timestamp));
                         break;
                     }
                     case SampleRow.ListOneofCase.Int32Samples:
                     {
-                        samples = row.Int32Samples.Samples.Select(x => (double)x.Value).ToList();
+                        mappedParameters.Add(this.CreateSqlRowDto(channels, row.Int32Samples.Samples.Select(x => (double)x.Value), timestamp));
                         break;
                     }
                     case SampleRow.ListOneofCase.BoolSamples:
                     {
-                        samples = row.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0).ToList();
+                        mappedParameters.Add(this.CreateSqlRowDto(channels, row.BoolSamples.Samples.Select(x => x.Value ? 1.0 : 0.0), timestamp));
                         break;
                     }
                     case SampleRow.ListOneofCase.StringSamples:
@@ -53,18 +52,14 @@ namespace Stream.Api.Stream.Reader.SqlRace.Mappers
                         continue;
                     }
                 }
-
-                mappedParameters.Add(
-                    new SqlRaceRowDto
-                    {
-                        Channels = channels,
-                        Data = samples.SelectMany(BitConverter.GetBytes).ToArray(),
-                        Interval = 0,
-                        Timestamp = ConvertUnixToSqlRaceTime(timestamp)
-                    });
             }
 
             return mappedParameters;
+        }
+
+        private SqlRaceRowDto CreateSqlRowDto(IReadOnlyList<uint> channels, IEnumerable<double> samples, ulong timestamp)
+        {
+            return new SqlRaceRowDto(channels, timestamp.ToSqlRaceTime(), samples.SelectMany(BitConverter.GetBytes).ToArray(), 0);
         }
     }
 }

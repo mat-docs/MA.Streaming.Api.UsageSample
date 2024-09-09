@@ -7,7 +7,7 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    public class PacketHandler : IPacketHandler
+    internal class PacketHandler : IPacketHandler
     {
         private readonly PeriodicDataHandler periodicDataHandler;
         private readonly RowDataHandler rowDataHandler;
