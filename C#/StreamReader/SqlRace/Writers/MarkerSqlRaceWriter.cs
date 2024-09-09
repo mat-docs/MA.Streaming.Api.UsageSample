@@ -18,6 +18,11 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
         {
             var markerDto = (ISqlRaceMarkerDto)data;
             var marker = new Marker(markerDto.Timestamp, markerDto.Name);
+            if (this.ClientSession.Session.Markers.Contains(marker))
+            {
+                // Drop the marker if the same marker has already been added.
+                return true;
+            }
             try
             {
                 this.ClientSession.Session.Markers.Add(marker);

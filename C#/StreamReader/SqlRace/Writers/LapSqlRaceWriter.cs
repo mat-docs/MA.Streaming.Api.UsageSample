@@ -18,6 +18,11 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
         {
             var lapDto = (ISqlRaceLapDto)data;
             var lap = new Lap(lapDto.Timestamp, lapDto.LapNumber, lapDto.TriggerSource, lapDto.Name, lapDto.CountForFastestLap);
+            if (this.ClientSession.Session.LapCollection.Contains(lap))
+            {
+                // Drop the lap as its already in the session.
+                return true;
+            }
             try
             {
                 this.ClientSession.Session.LapCollection.Add(lap);

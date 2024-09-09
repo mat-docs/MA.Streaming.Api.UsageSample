@@ -38,7 +38,7 @@ namespace Stream.Api.Stream.Reader.StreamApiReader
             {
                 Task.Delay(1000).Wait();
             }
-            while (DateTime.Now - this.lastUpdated < TimeSpan.FromSeconds(60));
+            while (DateTime.Now - this.lastUpdated < TimeSpan.FromSeconds(10));
 
             this.streamApiClient.TryCloseConnection(this.connection);
         }
