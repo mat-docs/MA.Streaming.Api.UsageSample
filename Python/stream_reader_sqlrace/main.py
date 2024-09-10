@@ -163,11 +163,10 @@ class StreamReaderSql:
                 self.identifiers_with_missing_config.add(parameter_identifier)
                 missing_config = True
 
-        if not missing_config:
-            return missing_config
+        if missing_config:
+            self.packets_to_add.appendleft(packet)
+            logger.debug("Missing config packet added to queue")
 
-        self.packets_to_add.appendleft(packet)
-        logger.debug("Missing config packet added to queue")
         return missing_config
 
     async def handle_event_packet_missing_config(self, packet: open_data_pb2.EventPacket, event_identifier: str):
@@ -185,11 +184,10 @@ class StreamReaderSql:
             self.events_with_missing_config.add(event_identifier)
             missing_config = True
 
-        if not missing_config:
-            return missing_config
+        if missing_config:
+            self.packets_to_add.appendleft(packet)
+            logger.debug("Missing config packet added to queue")
 
-        self.packets_to_add.appendleft(packet)
-        logger.debug("Missing config packet added to queue")
         return missing_config
 
     async def schedule_process_queue(self):
