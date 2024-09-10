@@ -354,10 +354,11 @@ class AtlasSessionWriter:
             lap_name,
             count_for_fastest_lap,
         )
-        self.session.LapCollection.Add(newlap)
-        logger.info(
-            'Lap "%s" with number %i added at %s', lap_name, lap_number, timestamp
-        )
+        if not self.session.LapCollection.Contains(newlap):
+            self.session.LapCollection.Add(newlap)
+            logger.info(
+                'Lap "%s" with number %i added at %s', lap_name, lap_number, timestamp
+            )
 
     def close_session(self):
         # Close the session if one was created
@@ -373,8 +374,8 @@ class AtlasSessionWriter:
     def add_marker(self, timestamp: int, label: str):
         """Add a point marker to the session."""
         new_point_marker = Marker(int(timestamp), label)
-        new_markers = Array[Marker]([new_point_marker])
-        self.session.Markers.Add(new_markers)
+        if not self.session.Markers.Contains(new_point_marker):
+            self.session.Markers.Add(new_point_marker)
 
     def add_event_data(self, event_identifier: str, event_time: int, raw_data):
         """Add an event instance data to the session."""
