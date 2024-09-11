@@ -56,7 +56,7 @@ class StreamReaderSql:
         self.row_packet_processor: RowPacketProcessor = None
         self.data_format_cache: DataFormatCache = None
         self.packet_queue_limit = 200_000
-        self.process_queue_interval = 30
+        self.process_queue_interval = 10
         self.terminate = threading.Event()
 
     def __enter__(self):
@@ -103,47 +103,58 @@ class StreamReaderSql:
                     if stop_notification.session_key == self.session_key:
                         break
 
-        while (datetime.now() - self.last_processed < timedelta(seconds=self.process_queue_interval+5)) or (len(self.packets_to_add) > 0):
-            await asyncio.sleep(self.process_queue_interval+10)
+        while (datetime.now() - self.last_processed < timedelta(seconds=self.process_queue_interval + 5)) or (
+                len(self.packets_to_add) > 0):
+            await asyncio.sleep(self.process_queue_interval + 10)
         logger.info("Finished processing remaining packets, terminating...")
         self.terminate_main_task()
 
     def terminate_main_task(self, *_):
         logger.info("Terminating main task.")
+        self.terminate.set()
         self.essentials_iterator.cancel()
         self.packets_iterator.cancel()
         # self.main_task.cancel()
         # self.read_essentials_task.cancel()
-        self.terminate.set()
 
     async def read_essentials(self):
         logger.info("Start reading essential packets")
         async with grpc.aio.insecure_channel(self.grpc_address) as channel:
             packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
             essentials_iterator = packet_reader_stub.ReadEssentials(
-                    api_pb2.ReadEssentialsRequest(connection=self.connection)
+                api_pb2.ReadEssentialsRequest(connection=self.connection)
             )
             self.essentials_iterator = essentials_iterator
             async for essentials_packet_response in essentials_iterator:
                 logger.debug("New essential packet received.")
-                await asyncio.gather(*[self.deserialize_new_packet(response.packet, True) for response in essentials_packet_response.response])
+                await asyncio.gather(*[self.deserialize_new_packet(response.packet, True) for response in
+                                       essentials_packet_response.response])
                 await self.process_queue()
 
     async def read_packets(self):
-        logger.info("Start reading packets")
-        options = [('grpc.max_message_length', 100 * 1024 * 1024)]
-        async with grpc.aio.insecure_channel(self.grpc_address, options=options) as channel:
-            packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
-            packets_iterator = packet_reader_stub.ReadPackets(
-                api_pb2.ReadPacketsRequest(connection=self.connection)
-            )
-            self.packets_iterator = packets_iterator
-            async for new_packet_response in packets_iterator:
-                logger.debug("New packet received.")
-                await asyncio.gather(*[self.deserialize_new_packet(response.packet, True) for response in new_packet_response.response])
-                if len(self.packets_to_add) > self.packet_queue_limit:
-                    # back off reading packets if we can't process it fast enough
-                    await asyncio.sleep(len(self.packets_to_add)/self.packet_queue_limit)
+        while not self.terminate.is_set():
+            logger.info("Start reading packets")
+            options = [('grpc.max_receive_message_length', 8*1024*1024)]
+            async with grpc.aio.insecure_channel(self.grpc_address, options=options) as channel:
+                packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
+                packets_iterator = packet_reader_stub.ReadPackets(
+                    api_pb2.ReadPacketsRequest(connection=self.connection)
+                )
+                self.packets_iterator = packets_iterator
+                try:
+                    async for new_packet_response in packets_iterator:
+                        logger.debug("New packet received.")
+                        await asyncio.gather(*[self.deserialize_new_packet(response.packet, True) for response in
+                                               new_packet_response.response])
+                        if len(self.packets_to_add) > self.packet_queue_limit * 2:
+                            # back off reading packets if we can't process it fast enough
+                            await asyncio.sleep(len(self.packets_to_add) / self.packet_queue_limit)
+                        if self.update_connection():
+                            logger.info("New stream found, restarting packet reader.")
+                            packets_iterator.cancel()
+                            break
+                except asyncio.CancelledError:
+                    pass
 
     async def handle_packet_missing_config(self, packet, parameter_identifiers):
         """Process the packet for missing config.
@@ -190,6 +201,40 @@ class StreamReaderSql:
 
         return missing_config
 
+    def update_connection(self):
+        current_connection = self.stream_api.connection_manager_service_stub.GetConnection(
+            api_pb2.GetConnectionRequest(
+                connection=self.connection
+            )
+        ).details
+
+        session_info_response = self.stream_api.session_management_service_stub.GetSessionInfo(
+            api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+        )
+        missing_stream = False
+        for stream in session_info_response.streams:
+            if stream not in current_connection.streams:
+                key = f"{session_info_response.data_source}.{stream}:0"
+                offset = session_info_response.topic_partition_offsets.get(key, 0)
+                current_connection.streams.append(stream)
+                current_connection.stream_offsets.append(offset)
+                missing_stream = True
+
+        # Recreate the connection if there are new streams
+        if missing_stream:
+            self.stream_api.connection_manager_service_stub.CloseConnection(
+                api_pb2.CloseConnectionRequest(
+                    connection=self.connection
+                )
+            )
+            connection_response = self.stream_api.connection_manager_service_stub.NewConnection(
+                api_pb2.NewConnectionRequest(details=current_connection)
+            )
+            self.connection = connection_response.connection
+            logger.info("Updated connection\n%s",current_connection)
+            return True
+        return False
+
     async def schedule_process_queue(self):
         while True:  # Terminated by setting terminate
             await asyncio.sleep(self.process_queue_interval)
@@ -200,12 +245,14 @@ class StreamReaderSql:
                 break
 
     async def process_queue(self):
-        self.session_writer.add_missing_configration(
-            list(self.identifiers_with_missing_config.copy()),
-            list(self.events_with_missing_config.copy())
-        )
+        missing_identifiers = list(self.identifiers_with_missing_config.copy())
         self.identifiers_with_missing_config.clear()
+        missing_events = list(self.events_with_missing_config.copy())
         self.events_with_missing_config.clear()
+        self.session_writer.add_missing_configration(
+            missing_identifiers,
+            missing_events
+        )
 
         packets = list(self.packets_to_add)
         self.packets_to_add.clear()
