@@ -1,5 +1,6 @@
 import os
 import logging
+import random
 import struct
 import datetime
 import time
@@ -324,8 +325,6 @@ class AtlasSessionWriter:
 
         self.session.AddRowData(channel_id, timestamps_array, databytes, 8, False)
 
-        # Make sure to add a lap at the beginning. It should come from the writer.
-
         return True
 
     def add_lap(
@@ -383,10 +382,13 @@ class AtlasSessionWriter:
         raw_data = Array[Double](raw_data)
         if event_identifier in self.event_identifier_mapping:
             event_definition_key = self.event_identifier_mapping[event_identifier]
-            self.session.Events.AddEventData(
-                event_definition_key, app_group, int(event_time), raw_data  # default to no group name
-            )
-            return
+            try:
+                self.session.Events.AddEventData(
+                    event_definition_key, app_group, int(event_time), raw_data
+                )
+                return True
+            except Exception as e:
+                logger.debug("Failed to add event to session, %s", e)
         else:
             logger.warning(
                 "No config processed for event %s, data not added",
@@ -404,7 +406,7 @@ class AtlasSessionWriter:
         event_definitions = []
 
         for event_identifier in event_identifiers:
-            event_definition_id = time.time_ns()//2**31
+            event_definition_id = random.randint(0,2**16)
 
             event_definition = open_data_pb2.EventDefinition(
                 identifier=event_identifier,

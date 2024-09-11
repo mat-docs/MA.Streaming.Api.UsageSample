@@ -396,9 +396,10 @@ class StreamReaderSql:
                 return
         timestamps_ns = packet.timestamp
         timestamps_sqlrace = np.mod(timestamps_ns, np.int64(1e9 * 3600 * 24))
-        self.session_writer.add_event_data(
-            event_identifier, timestamps_sqlrace, packet.raw_values
-        )
+        if not await asyncio.to_thread(self.session_writer.add_event_data,
+                                       event_identifier, timestamps_sqlrace, packet.raw_values
+                                       ):
+            logger.warning("Failed to add event %s", event_identifier)
 
     async def main(self):
         # This stream reader will continuously wait for a live session until it is stopped.
