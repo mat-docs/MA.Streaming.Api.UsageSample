@@ -11,10 +11,12 @@ See Also:
 
 import asyncio
 import logging
+import os
 import signal
 import threading
 from datetime import datetime, timedelta
 from collections import deque
+import json
 
 import grpc
 import numpy as np
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 class StreamReaderSql:
     """Read data from the Stream API and write it to an ATLAS Session"""
 
-    def __init__(self, sqlrace_data_source, sqlrace_database):
+    def __init__(self, sqlrace_server, sqlrace_database):
         self.last_processed = datetime.now()
         self.packets_to_add = deque()
         self.identifiers_with_missing_config = set()
@@ -50,7 +52,7 @@ class StreamReaderSql:
         self.read_essentials_task = None
         self.schedule_process_queue_task = None
         self.is_session_complete = False
-        self.sqlrace_data_source = sqlrace_data_source
+        self.sqlrace_server = sqlrace_server
         self.sqlrace_database = sqlrace_database
         self.session_writer: AtlasSessionWriter = None
         self.row_packet_processor: RowPacketProcessor = None
@@ -506,7 +508,7 @@ class StreamReaderSql:
         self.connection = connection_response.connection
 
         # Create a corresponding ATLAS session
-        self.session_writer = AtlasSessionWriter(self.sqlrace_data_source, self.sqlrace_database,
+        self.session_writer = AtlasSessionWriter(self.sqlrace_server, self.sqlrace_database,
                                                  session_info_response.identifier)
         self.data_format_cache = DataFormatCache(self.data_source, self.grpc_address)
         self.row_packet_processor = RowPacketProcessor(self.session_writer, self.data_format_cache)
@@ -529,8 +531,14 @@ class StreamReaderSql:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(thread)d  %(levelname)s %(name)s %(message)s")
 
-    data_source = r"MCLA-5JRZTQ3\LOCAL"
-    database = "SQLRACE01"
-    with StreamReaderSql(data_source, database) as stream_recorder:
-        stream_recorder.data_source = "Default"
+    file_path = os.path.realpath(__file__)
+    with open(os.path.join(os.path.dirname(file_path), "Config.json")) as f:
+        config = json.load(f)
+
+    sqlrace_server = config["sqlRaceServer"]
+    sqlrace_database = config["sqlRaceDatabase"]
+    with StreamReaderSql(sqlrace_server, sqlrace_database) as stream_recorder:
+        stream_recorder.data_source = config["dataSource"]
+        # Specify a session key to process sessions historically.
+        # stream_recorder.session_key = "b0d7b0f9-46cf-48ca-a59a-766c2c0f1815"
         asyncio.run(stream_recorder.main())
