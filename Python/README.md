@@ -33,4 +33,3 @@ This example demonstrates how to consume data from the broker via the Stream API
 The example will read packets for an ongoing session, and write the contents to an
 ATLAS Session.
 If there are no ongoing session, it will wait until a new one starts.
-The example will continuously wait for a live session until stopped.
