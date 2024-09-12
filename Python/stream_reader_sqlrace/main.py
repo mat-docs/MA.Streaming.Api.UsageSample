@@ -73,12 +73,19 @@ class StreamReaderSql:
         if self.row_packet_processor is not None:
             self.row_packet_processor.stop()
         # if the session writer is initialized and the session hasn't been closed yet.
-        if self.session_writer is not None and self.session_writer.sql_race_connection is not None:
-            session_info_response = self.stream_api.session_management_service_stub.GetSessionInfo(
-                api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+        if (
+            self.session_writer is not None
+            and self.session_writer.sql_race_connection is not None
+        ):
+            session_info_response = (
+                self.stream_api.session_management_service_stub.GetSessionInfo(
+                    api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+                )
             )
             self.is_session_complete = session_info_response.is_complete
-            self.session_writer.session.UpdateIdentifier(session_info_response.identifier)
+            self.session_writer.session.UpdateIdentifier(
+                session_info_response.identifier
+            )
             self.session_writer.add_details("Data Source", self.data_source)
             self.session_writer.close_session()
         close_session_response = (
@@ -95,18 +102,27 @@ class StreamReaderSql:
         # If the session is live, subscribe to the session stop notification
         if not self.is_session_complete:
             async with grpc.aio.insecure_channel(self.grpc_address) as channel:
-                session_management_stub = api_pb2_grpc.SessionManagementServiceStub(channel)
+                session_management_stub = api_pb2_grpc.SessionManagementServiceStub(
+                    channel
+                )
                 async for (
-                        stop_notification
+                    stop_notification
                 ) in session_management_stub.GetSessionStopNotification(
-                    api_pb2.GetSessionStopNotificationRequest(data_source=self.data_source)
+                    api_pb2.GetSessionStopNotificationRequest(
+                        data_source=self.data_source
+                    )
                 ):
-                    logger.debug("Stop notification received for session: %s", stop_notification.session_key)
+                    logger.debug(
+                        "Stop notification received for session: %s",
+                        stop_notification.session_key,
+                    )
                     if stop_notification.session_key == self.session_key:
                         break
 
-        while (datetime.now() - self.last_processed < timedelta(seconds=self.process_queue_interval + 5)) or (
-                len(self.packets_to_add) > 0):
+        while (
+            datetime.now() - self.last_processed
+            < timedelta(seconds=self.process_queue_interval + 5)
+        ) or (len(self.packets_to_add) > 0):
             await asyncio.sleep(self.process_queue_interval + 10)
         logger.info("Finished processing remaining packets, terminating...")
         self.terminate_main_task()
@@ -129,15 +145,21 @@ class StreamReaderSql:
             self.essentials_iterator = essentials_iterator
             async for essentials_packet_response in essentials_iterator:
                 logger.debug("New essential packet received.")
-                await asyncio.gather(*[self.deserialize_new_packet(response.packet, True) for response in
-                                       essentials_packet_response.response])
+                await asyncio.gather(
+                    *[
+                        self.deserialize_new_packet(response.packet, True)
+                        for response in essentials_packet_response.response
+                    ]
+                )
                 await self.process_queue()
 
     async def read_packets(self):
         while not self.terminate.is_set():
             logger.info("Start reading packets")
-            options = [('grpc.max_receive_message_length', 8*1024*1024)]
-            async with grpc.aio.insecure_channel(self.grpc_address, options=options) as channel:
+            options = [("grpc.max_receive_message_length", 8 * 1024 * 1024)]
+            async with grpc.aio.insecure_channel(
+                self.grpc_address, options=options
+            ) as channel:
                 packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
                 packets_iterator = packet_reader_stub.ReadPackets(
                     api_pb2.ReadPacketsRequest(connection=self.connection)
@@ -146,11 +168,17 @@ class StreamReaderSql:
                 try:
                     async for new_packet_response in packets_iterator:
                         logger.debug("New packet received.")
-                        await asyncio.gather(*[self.deserialize_new_packet(response.packet, True) for response in
-                                               new_packet_response.response])
+                        await asyncio.gather(
+                            *[
+                                self.deserialize_new_packet(response.packet, True)
+                                for response in new_packet_response.response
+                            ]
+                        )
                         if len(self.packets_to_add) > self.packet_queue_limit * 2:
                             # back off reading packets if we can't process it fast enough
-                            await asyncio.sleep(len(self.packets_to_add) / self.packet_queue_limit)
+                            await asyncio.sleep(
+                                len(self.packets_to_add) / self.packet_queue_limit
+                            )
                         if self.update_connection():
                             logger.info("New stream found, restarting packet reader.")
                             packets_iterator.cancel()
@@ -172,7 +200,10 @@ class StreamReaderSql:
         for parameter_identifier in parameter_identifiers:
             if len(parameter_identifier.split(":")) == 1:
                 parameter_identifier += ":StreamAPI"
-            if parameter_identifier not in self.session_writer.parameter_channel_id_mapping.keys():
+            if (
+                parameter_identifier
+                not in self.session_writer.parameter_channel_id_mapping.keys()
+            ):
                 self.identifiers_with_missing_config.add(parameter_identifier)
                 missing_config = True
 
@@ -182,7 +213,9 @@ class StreamReaderSql:
 
         return missing_config
 
-    async def handle_event_packet_missing_config(self, packet: open_data_pb2.EventPacket, event_identifier: str):
+    async def handle_event_packet_missing_config(
+        self, packet: open_data_pb2.EventPacket, event_identifier: str
+    ):
         """Process the packet for missing config.
 
         Args:
@@ -204,14 +237,16 @@ class StreamReaderSql:
         return missing_config
 
     def update_connection(self):
-        current_connection = self.stream_api.connection_manager_service_stub.GetConnection(
-            api_pb2.GetConnectionRequest(
-                connection=self.connection
-            )
-        ).details
+        current_connection = (
+            self.stream_api.connection_manager_service_stub.GetConnection(
+                api_pb2.GetConnectionRequest(connection=self.connection)
+            ).details
+        )
 
-        session_info_response = self.stream_api.session_management_service_stub.GetSessionInfo(
-            api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+        session_info_response = (
+            self.stream_api.session_management_service_stub.GetSessionInfo(
+                api_pb2.GetSessionInfoRequest(session_key=self.session_key)
+            )
         )
         missing_stream = False
         for stream in session_info_response.streams:
@@ -225,15 +260,15 @@ class StreamReaderSql:
         # Recreate the connection if there are new streams
         if missing_stream:
             self.stream_api.connection_manager_service_stub.CloseConnection(
-                api_pb2.CloseConnectionRequest(
-                    connection=self.connection
+                api_pb2.CloseConnectionRequest(connection=self.connection)
+            )
+            connection_response = (
+                self.stream_api.connection_manager_service_stub.NewConnection(
+                    api_pb2.NewConnectionRequest(details=current_connection)
                 )
             )
-            connection_response = self.stream_api.connection_manager_service_stub.NewConnection(
-                api_pb2.NewConnectionRequest(details=current_connection)
-            )
             self.connection = connection_response.connection
-            logger.info("Updated connection\n%s",current_connection)
+            logger.info("Updated connection\n%s", current_connection)
             return True
         return False
 
@@ -252,22 +287,24 @@ class StreamReaderSql:
         missing_events = list(self.events_with_missing_config.copy())
         self.events_with_missing_config.clear()
         self.session_writer.add_missing_configration(
-            missing_identifiers,
-            missing_events
+            missing_identifiers, missing_events
         )
 
         packets = list(self.packets_to_add)
         self.packets_to_add.clear()
-        self.packets_to_add.extendleft(packets[self.packet_queue_limit:][::-1])
-        packets = packets[:self.packet_queue_limit]
+        self.packets_to_add.extendleft(packets[self.packet_queue_limit :][::-1])
+        packets = packets[: self.packet_queue_limit]
 
-        logger.info("Processing %i packets from queue. Remaining queue length: %i", len(packets),
-                    len(self.packets_to_add))
+        logger.info(
+            "Processing %i packets from queue. Remaining queue length: %i",
+            len(packets),
+            len(self.packets_to_add),
+        )
 
         await asyncio.gather(*[self.route_new_packet(packets) for packets in packets])
 
     async def deserialize_new_packet(
-            self, new_packet: open_data_pb2.Packet, match_session_key: bool = False
+        self, new_packet: open_data_pb2.Packet, match_session_key: bool = False
     ):
         """Decodes new protobuf packets received from the Stream API.
 
@@ -324,7 +361,7 @@ class StreamReaderSql:
             logger.info("Unknown packet type, discarded packet %s", packet.__class__)
 
     async def handle_configuration_packet(
-            self, packet: open_data_pb2.ConfigurationPacket
+        self, packet: open_data_pb2.ConfigurationPacket
     ):
         # Create a corresponding config in atlas
         self.session_writer.add_configration(packet)
@@ -333,7 +370,9 @@ class StreamReaderSql:
         ##  Get the parameter identifier
         if packet.data_format.data_format_identifier != 0:
             data_format_identifier = packet.data_format.data_format_identifier
-            parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
+            parameter_identifiers = self.data_format_cache.get_cached_parameter_list(
+                data_format_identifier
+            )
         else:
             parameter_identifiers = (
                 packet.data_format.parameter_identifiers.parameter_identifiers
@@ -366,16 +405,23 @@ class StreamReaderSql:
         timestamps_sqlrace = np.mod(timestamps_ns, np.int64(1e9 * 3600 * 24))
         # add the data to the session
         for parameter_identifier, data_for_param in zip(parameter_identifiers, data):
-            if not await asyncio.to_thread(self.session_writer.add_data,
-                                           parameter_identifier, data_for_param, timestamps_sqlrace
-                                           ):
-                logger.warning("Failed to add data for parameter %s", parameter_identifier)
+            if not await asyncio.to_thread(
+                self.session_writer.add_data,
+                parameter_identifier,
+                data_for_param,
+                timestamps_sqlrace,
+            ):
+                logger.warning(
+                    "Failed to add data for parameter %s", parameter_identifier
+                )
 
     async def handle_row_packet(self, packet: open_data_pb2.RowDataPacket):
         ##  Get the parameter identifier
         if packet.data_format.data_format_identifier != 0:
             data_format_identifier = packet.data_format.data_format_identifier
-            parameter_identifiers = self.data_format_cache.get_cached_parameter_list(data_format_identifier)
+            parameter_identifiers = self.data_format_cache.get_cached_parameter_list(
+                data_format_identifier
+            )
         else:
             parameter_identifiers = (
                 packet.data_format.parameter_identifiers.parameter_identifiers
@@ -424,7 +470,6 @@ class StreamReaderSql:
                 print(f"Unsupported value type for metadata: {key}")
 
     async def handle_event_packet(self, packet: open_data_pb2.EventPacket):
-        # TODO: deal with missing configs
         if packet.data_format.data_format_identifier != 0:
             data_format_manager_stub = self.stream_api.data_format_manager_service_stub
             event_identifier_response = data_format_manager_stub.GetEvent(
@@ -445,9 +490,12 @@ class StreamReaderSql:
                 return
         timestamps_ns = packet.timestamp
         timestamps_sqlrace = np.mod(timestamps_ns, np.int64(1e9 * 3600 * 24))
-        if not await asyncio.to_thread(self.session_writer.add_event_data,
-                                       event_identifier, timestamps_sqlrace, packet.raw_values
-                                       ):
+        if not await asyncio.to_thread(
+            self.session_writer.add_event_data,
+            event_identifier,
+            timestamps_sqlrace,
+            packet.raw_values,
+        ):
             logger.warning("Failed to add event %s", event_identifier)
 
     async def main(self):
@@ -456,7 +504,6 @@ class StreamReaderSql:
         connection_management_stub = self.stream_api.connection_manager_service_stub
         session_management_stub = self.stream_api.session_management_service_stub
 
-        # TODO: update log messages now that we can feed in session key directly.
         # Set up a handler if we want to terminate early by ctrl+c
         signal.signal(signal.SIGINT, self.terminate_main_task)
         # Get the latest live session
@@ -477,7 +524,7 @@ class StreamReaderSql:
         if self.session_key is None:
             logger.info("No live session found, waiting for new session to start.")
             for new_session in session_management_stub.GetSessionStartNotification(
-                    api_pb2.GetSessionStartNotificationRequest(data_source=self.data_source)
+                api_pb2.GetSessionStartNotificationRequest(data_source=self.data_source)
             ):
                 self.session_key = new_session.session_key
                 logger.info("Identified live session %s", self.session_key)
@@ -487,7 +534,7 @@ class StreamReaderSql:
             api_pb2.GetSessionInfoRequest(session_key=self.session_key)
         )
         self.is_session_complete = session_info_response.is_complete
-        while session_info_response.identifier == '':
+        while session_info_response.identifier == "":
             session_info_response = session_management_stub.GetSessionInfo(
                 api_pb2.GetSessionInfoRequest(session_key=self.session_key)
             )
@@ -508,28 +555,34 @@ class StreamReaderSql:
         self.connection = connection_response.connection
 
         # Create a corresponding ATLAS session
-        self.session_writer = AtlasSessionWriter(self.sqlrace_server, self.sqlrace_database,
-                                                 session_info_response.identifier)
+        self.session_writer = AtlasSessionWriter(
+            self.sqlrace_server, self.sqlrace_database, session_info_response.identifier
+        )
         self.data_format_cache = DataFormatCache(self.data_source, self.grpc_address)
-        self.row_packet_processor = RowPacketProcessor(self.session_writer, self.data_format_cache)
+        self.row_packet_processor = RowPacketProcessor(
+            self.session_writer, self.data_format_cache
+        )
 
         # Read essential stream which contains essential information such as configs
-        self.read_essentials_task = asyncio.create_task(
-            self.read_essentials()
-        )
+        self.read_essentials_task = asyncio.create_task(self.read_essentials())
 
         # Read packets and monitor session stop at the same time
         self.main_task = asyncio.gather(
             self.session_stop(),
             self.read_packets(),
         )
-        self.schedule_process_queue_task = asyncio.create_task(self.schedule_process_queue())
+        self.schedule_process_queue_task = asyncio.create_task(
+            self.schedule_process_queue()
+        )
         logger.debug("Starting main task.")
         await self.main_task
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(thread)d  %(levelname)s %(name)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(thread)d  %(levelname)s %(name)s %(message)s",
+    )
 
     file_path = os.path.realpath(__file__)
     with open(os.path.join(os.path.dirname(file_path), "Config.json")) as f:

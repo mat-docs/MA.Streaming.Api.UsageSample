@@ -13,12 +13,15 @@ class DataFormatCache:
         self.stream_api = StreamApi(self.grpc_address)
 
     @cache
-    def get_cached_data_format_identifier(self, parameter_identifiers: List[str]) -> int:
+    def get_cached_data_format_identifier(
+        self, parameter_identifiers: List[str]
+    ) -> int:
         data_format_manager_stub = self.stream_api.data_format_manager_service_stub
-        data_format_identifier_response = data_format_manager_stub.GetParameterDataFormatId(
-            api_pb2.GetParameterDataFormatIdRequest(
-                data_source=self.data_source,
-                parameters=parameter_identifiers
+        data_format_identifier_response = (
+            data_format_manager_stub.GetParameterDataFormatId(
+                api_pb2.GetParameterDataFormatIdRequest(
+                    data_source=self.data_source, parameters=parameter_identifiers
+                )
             )
         )
         return data_format_identifier_response.data_format_identifier

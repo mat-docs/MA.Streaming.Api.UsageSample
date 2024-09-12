@@ -70,8 +70,12 @@ from MESL.SqlRace.Enumerators import (  # .NET imports, so pylint: disable=wrong
 
 class AtlasSessionWriter:
 
-    def __init__(self, data_source=r"MCLA-5JRZTQ3\LOCAL", database="SQLRACE01",
-                 session_identifier=f"Stream API DEMO {datetime.datetime.now()}"):
+    def __init__(
+        self,
+        data_source=r"MCLA-5JRZTQ3\LOCAL",
+        database="SQLRACE01",
+        session_identifier=f"Stream API DEMO {datetime.datetime.now()}",
+    ):
         self.sql_race_connection = None
         self.session = None
         self.event_identifier_mapping = {}
@@ -79,13 +83,11 @@ class AtlasSessionWriter:
         self.parameter_channel_id_mapping = {}
         self.create_sqlrace_session(data_source, database, session_identifier)
 
-    def create_sqlrace_session(self, data_source: str, database: str, session_identifier):
+    def create_sqlrace_session(
+        self, data_source: str, database: str, session_identifier
+    ):
         sql_db_connection = SQLRaceDBConnection(
-            data_source,
-            database,
-            session_identifier,
-            mode="w",
-            recorder=True
+            data_source, database, session_identifier, mode="w", recorder=True
         )
         self.sql_race_connection = sql_db_connection
         self.session = sql_db_connection.session
@@ -116,8 +118,8 @@ class AtlasSessionWriter:
 
         # if we have processed this config previously then we can just use it
         if configSetManager.Exists(
-                DatabaseConnectionInformation(self.session.ConnectionString),
-                config_identifier,
+            DatabaseConnectionInformation(self.session.ConnectionString),
+            config_identifier,
         ):
             logger.info(
                 "Logging config already exist, skip reprocessing logging config. "
@@ -242,7 +244,7 @@ class AtlasSessionWriter:
             # will be applied.
             conversion_function_names = [one_to_one_conversion_name] * 3
             for i, text_conversion_definition in enumerate(
-                    event_definition.conversions
+                event_definition.conversions
             ):
                 if text_conversion_definition.conversion_identifier != "":
                     config.AddConversion(
@@ -261,8 +263,12 @@ class AtlasSessionWriter:
             # .NET objects, so pylint: disable=invalid-name
             conversionFunctionNames = Array[String](conversion_function_names)
 
-            self.event_identifier_mapping[event_definition.identifier] = event_definition.definition_id
-            self.event_application_group_mapping[event_definition.identifier] = event_definition.application_name
+            self.event_identifier_mapping[event_definition.identifier] = (
+                event_definition.definition_id
+            )
+            self.event_application_group_mapping[event_definition.identifier] = (
+                event_definition.application_name
+            )
             # .NET objects, so pylint: disable=invalid-name
             eventDefinition = EventDefinition(
                 event_definition.definition_id,
@@ -284,7 +290,7 @@ class AtlasSessionWriter:
         self.session.UseLoggingConfigurationSet(config.Identifier)
 
     def add_data(
-            self, parameter_identifier: str, data: List[float], timestamps: List[float]
+        self, parameter_identifier: str, data: List[float], timestamps: List[float]
     ) -> bool:
         """Add data to a parameter.
 
@@ -317,7 +323,7 @@ class AtlasSessionWriter:
         databytes = bytearray(len(data) * 8)
         for i, value in enumerate(data):
             new_bytes = struct.pack("d", value)
-            databytes[i * 8: i * 8 + len(new_bytes)] = new_bytes
+            databytes[i * 8 : i * 8 + len(new_bytes)] = new_bytes
 
         timestamps_array = Array[Int64](len(timestamps))
         for i, timestamp in enumerate(timestamps):
@@ -328,11 +334,11 @@ class AtlasSessionWriter:
         return True
 
     def add_lap(
-            self,
-            timestamp: int,
-            lap_number: int = 1,
-            lap_name: str = "Lap 1",
-            count_for_fastest_lap: bool = True,
+        self,
+        timestamp: int,
+        lap_number: int = 1,
+        lap_name: str = "Lap 1",
+        count_for_fastest_lap: bool = True,
     ) -> None:
         """Add a new lap to the session.
 
@@ -394,19 +400,23 @@ class AtlasSessionWriter:
                 "No config processed for event %s, data not added",
                 event_identifier,
             )
-            return False
+        return False
 
-    def add_missing_configration(self, parameter_identifiers: List[str], event_identifiers: List[str]):
+    def add_missing_configration(
+        self, parameter_identifiers: List[str], event_identifiers: List[str]
+    ):
         parameter_definitions = []
         for parameter_identifier in parameter_identifiers:
-            if parameter_identifier not in self.parameter_channel_id_mapping.keys():
-                param_def = self.build_parameter_definition_packet(*parameter_identifier.split(":"))
+            if parameter_identifier not in self.parameter_channel_id_mapping:
+                param_def = self.build_parameter_definition_packet(
+                    *parameter_identifier.split(":")
+                )
                 parameter_definitions.append(param_def)
 
         event_definitions = []
 
         for event_identifier in event_identifiers:
-            event_definition_id = random.randint(0,2**16)
+            event_definition_id = random.randint(0, 2**16)
 
             event_definition = open_data_pb2.EventDefinition(
                 identifier=event_identifier,
@@ -426,7 +436,9 @@ class AtlasSessionWriter:
         )
 
         if len(parameter_definitions) != 0 or len(event_definitions) != 0:
-            logger.info("Adding missing config for %i parameters.", len(parameter_definitions))
+            logger.info(
+                "Adding missing config for %i parameters.", len(parameter_definitions)
+            )
             logger.info("Adding missing config for %i events.", len(event_definitions))
             self.add_configration(config_packet)
 
@@ -452,5 +464,4 @@ def get_app_from_identifier(identifier: str):
     identifier = identifier.split(":")
     if len(identifier) == 2:
         return identifier[1]
-    else:
-        return "StreamAPI"
+    return "StreamAPI"
