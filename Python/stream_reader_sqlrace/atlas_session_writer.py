@@ -317,8 +317,6 @@ class AtlasSessionWriter:
                 parameter_identifier,
             )
             return False
-        channelIds = NETList[UInt32]()  # .NET objects, so pylint: disable=invalid-name
-        channelIds.Add(channel_id)
 
         databytes = bytearray(len(data) * 8)
         for i, value in enumerate(data):
@@ -330,6 +328,45 @@ class AtlasSessionWriter:
             timestamps_array[i] = Int64(int(timestamp))
 
         self.session.AddRowData(channel_id, timestamps_array, databytes, 8, False)
+
+        return True
+
+    def add_row(
+        self, parameter_identifiers: str, row: List[float], timestamp: float
+    ) -> bool:
+        """Add a row of data to the session.
+
+        Args:
+            parameter_identifiers: Names of parameter identifiers
+            row: The row of data to be added.
+            timestamp: Timestamp corresponds to the row of data
+
+        Returns:
+
+        """
+        channelIds = NETList[UInt32]()  # .NET objects, so pylint: disable=invalid-name
+        for parameter_identifier in parameter_identifiers:
+            # if there are no app group for parameter identifier
+            if len(parameter_identifier.split(":")) == 1:
+                parameter_identifier = parameter_identifier + ":StreamAPI"
+            if parameter_identifier in self.parameter_channel_id_mapping:
+                channel_id = self.parameter_channel_id_mapping[parameter_identifier]
+            else:
+                logger.warning(
+                    "No config processed for parameter %s, data not added",
+                    parameter_identifier,
+                )
+                return False
+            channelIds.Add(channel_id)
+
+        databytes = bytearray(len(row) * 8)
+        for i, value in enumerate(row):
+            new_bytes = struct.pack("d", value)
+            databytes[i * 8 : i * 8 + len(new_bytes)] = new_bytes
+
+        timestamp = Int64(int(timestamp))
+
+        self.session.AddRowData(timestamp, channelIds, databytes)
 
         return True
 
