@@ -1,11 +1,13 @@
 import os
 import logging
+import random
 import struct
 import datetime
+import time
 from typing import List
 
 from ma.streaming.open_data.v1 import open_data_pb2
-from stream_reader_sqlrace.sql_race import SQLiteConnection
+from stream_reader_sqlrace.sql_race import SQLRaceDBConnection
 
 logger = logging.getLogger(__name__)
 A10_INSTALL_PATH = r"C:\Program Files\McLaren Applied Technologies\ATLAS 10"
@@ -42,6 +44,7 @@ from System import (  # .NET imports, so pylint: disable=wrong-import-position,w
     UInt32,
     Array,
     Int64,
+    Double,
 )
 from MESL.SqlRace.Domain import (  # .NET imports, so pylint: disable=wrong-import-position,wrong-import-order,import-error
     Lap,
@@ -49,34 +52,45 @@ from MESL.SqlRace.Domain import (  # .NET imports, so pylint: disable=wrong-impo
     ParameterGroup,
     ApplicationGroup,
     RationalConversion,
+    TextConversion,
     ConfigurationSetAlreadyExistsException,
     Parameter,
     Channel,
     DatabaseConnectionInformation,
+    SessionDataItem,
+    Marker,
+    EventDefinition,
 )
 from MESL.SqlRace.Enumerators import (  # .NET imports, so pylint: disable=wrong-import-position,wrong-import-order,import-error
     DataType,
     ChannelDataSourceType,
+    EventPriorityType,
 )
 
 
 class AtlasSessionWriter:
 
-    def __init__(self, db_location: str = r"C:\McLaren Applied\StreamAPIDemo.ssndb"):
+    def __init__(
+        self,
+        data_source=r"MCLA-5JRZTQ3\LOCAL",
+        database="SQLRACE01",
+        session_identifier=f"Stream API DEMO {datetime.datetime.now()}",
+    ):
         self.sql_race_connection = None
         self.session = None
+        self.event_identifier_mapping = {}
+        self.event_application_group_mapping = {}
         self.parameter_channel_id_mapping = {}
-        self.create_sqlrace_session(db_location)
+        self.create_sqlrace_session(data_source, database, session_identifier)
 
-    def create_sqlrace_session(self, db_location: str):
-        sql_race_connection = SQLiteConnection(
-            db_location,
-            session_identifier=f"Stream API DEMO {datetime.datetime.now()}",
-            mode="w",
-            recorder=True,
+    def create_sqlrace_session(
+        self, data_source: str, database: str, session_identifier
+    ):
+        sql_db_connection = SQLRaceDBConnection(
+            data_source, database, session_identifier, mode="w", recorder=True
         )
-        self.sql_race_connection = sql_race_connection
-        self.session = sql_race_connection.session
+        self.sql_race_connection = sql_db_connection
+        self.session = sql_db_connection.session
 
     def add_configration(self, packet: open_data_pb2.ConfigurationPacket):
         """Creates parameters in ATLAS Session from the configuration
@@ -85,7 +99,7 @@ class AtlasSessionWriter:
         large amount of information. For all parameters regardless of the data type
         specified, it will create a row channel of doubles.
 
-        This function also ignores all the groups and events.
+        This function also ignores all the groups.
 
         For examples to use the SQLRace API fully, see the SQLRace API code samples.
 
@@ -120,9 +134,10 @@ class AtlasSessionWriter:
         )
 
         # Create 1to1 conversion
+        one_to_one_conversion_name = "DefaultConversion"
         config.AddConversion(
             RationalConversion.CreateSimple1To1Conversion(
-                "DefaultConversion", "kph", "%5.2f"
+                one_to_one_conversion_name, "", "%5.2f"
             )
         )
 
@@ -131,6 +146,8 @@ class AtlasSessionWriter:
         # find all application groups
         for parameter_definition in packet.parameter_definitions:
             app_groups.add(parameter_definition.application_name)
+        for event_definition in packet.event_definitions:
+            app_groups.add(event_definition.application_name)
 
         # add applications and parameter group for all the app groups
         for app in app_groups:
@@ -149,6 +166,7 @@ class AtlasSessionWriter:
 
         # Add a row channel per parameter
         for parameter_definition in packet.parameter_definitions:
+            conversion = one_to_one_conversion_name
             # Add a row channel
             channel_id = self.session.ReserveNextAvailableRowChannelId() % 2147483647
             self.parameter_channel_id_mapping[parameter_definition.identifier] = (
@@ -163,6 +181,21 @@ class AtlasSessionWriter:
                 ChannelDataSourceType.RowData,
             )
             config.AddChannel(myParameterChannel)
+
+            # If text conversion definition exist, then create the text conversion and
+            # update the conversion identifier from the default
+            if parameter_definition.conversion.conversion_identifier != "":
+                config.AddConversion(
+                    TextConversion(
+                        parameter_definition.conversion.conversion_identifier,
+                        parameter_definition.units,
+                        parameter_definition.format_string,
+                        parameter_definition.conversion.input_values,
+                        parameter_definition.conversion.string_values,
+                        parameter_definition.conversion.default,
+                    )
+                )
+                conversion = parameter_definition.conversion.conversion_identifier
 
             # Add Parameter
             # .NET objects, so pylint: disable=invalid-name
@@ -185,7 +218,7 @@ class AtlasSessionWriter:
                 0.0,
                 0xFFFF,
                 0,
-                "DefaultConversion",
+                conversion,
                 parameterGroupIdentifiers,
                 myParamChannelId,
                 parameter_definition.application_name,
@@ -193,6 +226,59 @@ class AtlasSessionWriter:
                 parameter_definition.units,
             )
             config.AddParameter(myParameter)
+
+        for event_definition in packet.event_definitions:
+            event_def_priority_map = {
+                open_data_pb2.EVENT_PRIORITY_DEBUG: EventPriorityType.Debug,
+                open_data_pb2.EVENT_PRIORITY_LOW: EventPriorityType.Low,
+                open_data_pb2.EVENT_PRIORITY_MEDIUM: EventPriorityType.Medium,
+                open_data_pb2.EVENT_PRIORITY_HIGH: EventPriorityType.High,
+                # no critical level in SQLRace, map it to high
+                open_data_pb2.EVENT_PRIORITY_CRITICAL: EventPriorityType.High,
+                # no unspecified level in SQLRace, map it to low
+                open_data_pb2.EVENT_PRIORITY_UNSPECIFIED: EventPriorityType.Low,
+            }
+
+            # Process the text configuration, if any.
+            # If there are no text configuration found then the one to one configuration
+            # will be applied.
+            conversion_function_names = [one_to_one_conversion_name] * 3
+            for i, text_conversion_definition in enumerate(
+                event_definition.conversions
+            ):
+                if text_conversion_definition.conversion_identifier != "":
+                    config.AddConversion(
+                        TextConversion(
+                            text_conversion_definition.conversion_identifier,
+                            "",
+                            "5.2f",
+                            text_conversion_definition.input_values,
+                            text_conversion_definition.string_values,
+                            text_conversion_definition.default,
+                        )
+                    )
+                    conversion_function_names[i] = (
+                        text_conversion_definition.conversion_identifier
+                    )
+            # .NET objects, so pylint: disable=invalid-name
+            conversionFunctionNames = Array[String](conversion_function_names)
+
+            self.event_identifier_mapping[event_definition.identifier] = (
+                event_definition.definition_id
+            )
+            self.event_application_group_mapping[event_definition.identifier] = (
+                event_definition.application_name
+            )
+            # .NET objects, so pylint: disable=invalid-name
+            eventDefinition = EventDefinition(
+                event_definition.definition_id,
+                event_definition.description,
+                event_def_priority_map[event_definition.priority],
+                conversionFunctionNames,
+                event_definition.application_name,
+            )
+
+            config.AddEventDefinition(eventDefinition)
 
         try:
             config.Commit()
@@ -220,16 +306,17 @@ class AtlasSessionWriter:
         Returns:
             True if the config is found and data added.
         """
-        try:
+        # if there are no app group for parameter identifier
+        if len(parameter_identifier.split(":")) == 1:
+            parameter_identifier = parameter_identifier + ":StreamAPI"
+        if parameter_identifier in self.parameter_channel_id_mapping:
             channel_id = self.parameter_channel_id_mapping[parameter_identifier]
-        except KeyError:
+        else:
             logger.warning(
                 "No config processed for parameter %s, data not added",
                 parameter_identifier,
             )
             return False
-        channelIds = NETList[UInt32]()  # .NET objects, so pylint: disable=invalid-name
-        channelIds.Add(channel_id)
 
         databytes = bytearray(len(data) * 8)
         for i, value in enumerate(data):
@@ -242,9 +329,44 @@ class AtlasSessionWriter:
 
         self.session.AddRowData(channel_id, timestamps_array, databytes, 8, False)
 
-        # if there isn't a lap then at one at the start
-        if self.session.LapCollection.Count == 0:
-            self.add_lap(min(timestamps))
+        return True
+
+    def add_row(
+        self, parameter_identifiers: str, row: List[float], timestamp: float
+    ) -> bool:
+        """Add a row of data to the session.
+
+        Args:
+            parameter_identifiers: Names of parameter identifiers
+            row: The row of data to be added.
+            timestamp: Timestamp corresponds to the row of data
+
+        Returns:
+
+        """
+        channelIds = NETList[UInt32]()  # .NET objects, so pylint: disable=invalid-name
+        for parameter_identifier in parameter_identifiers:
+            # if there are no app group for parameter identifier
+            if len(parameter_identifier.split(":")) == 1:
+                parameter_identifier = parameter_identifier + ":StreamAPI"
+            if parameter_identifier in self.parameter_channel_id_mapping:
+                channel_id = self.parameter_channel_id_mapping[parameter_identifier]
+            else:
+                logger.warning(
+                    "No config processed for parameter %s, data not added",
+                    parameter_identifier,
+                )
+                return False
+            channelIds.Add(channel_id)
+
+        databytes = bytearray(len(row) * 8)
+        for i, value in enumerate(row):
+            new_bytes = struct.pack("d", value)
+            databytes[i * 8 : i * 8 + len(new_bytes)] = new_bytes
+
+        timestamp = Int64(int(timestamp))
+
+        self.session.AddRowData(timestamp, channelIds, databytes)
 
         return True
 
@@ -274,12 +396,109 @@ class AtlasSessionWriter:
             lap_name,
             count_for_fastest_lap,
         )
-        self.session.LapCollection.Add(newlap)
-        logger.info(
-            'Lap "%s" with number %i added at %s', lap_name, lap_number, timestamp
-        )
+        if not self.session.LapCollection.Contains(newlap):
+            self.session.LapCollection.Add(newlap)
+            logger.info(
+                'Lap "%s" with number %i added at %s', lap_name, lap_number, timestamp
+            )
 
     def close_session(self):
         # Close the session if one was created
         if self.sql_race_connection is not None:
             self.sql_race_connection.close_session()
+            self.sql_race_connection = None
+
+    def add_details(self, key, value):
+        """Add a session detail to the session."""
+        session_item = SessionDataItem(key, value)
+        self.session.Items.Add(session_item)
+
+    def add_marker(self, timestamp: int, label: str):
+        """Add a point marker to the session."""
+        new_point_marker = Marker(int(timestamp), label)
+        if not self.session.Markers.Contains(new_point_marker):
+            self.session.Markers.Add(new_point_marker)
+
+    def add_event_data(self, event_identifier: str, event_time: int, raw_data):
+        """Add an event instance data to the session."""
+        app_group = self.event_application_group_mapping[event_identifier]
+        raw_data = Array[Double](raw_data)
+        if event_identifier in self.event_identifier_mapping:
+            event_definition_key = self.event_identifier_mapping[event_identifier]
+            try:
+                self.session.Events.AddEventData(
+                    event_definition_key, app_group, int(event_time), raw_data
+                )
+                return True
+            except Exception as e:
+                logger.debug("Failed to add event to session, %s", e)
+        else:
+            logger.warning(
+                "No config processed for event %s, data not added",
+                event_identifier,
+            )
+        return False
+
+    def add_missing_configration(
+        self, parameter_identifiers: List[str], event_identifiers: List[str]
+    ):
+        parameter_definitions = []
+        for parameter_identifier in parameter_identifiers:
+            if parameter_identifier not in self.parameter_channel_id_mapping:
+                param_def = self.build_parameter_definition_packet(
+                    *parameter_identifier.split(":")
+                )
+                parameter_definitions.append(param_def)
+
+        event_definitions = []
+
+        for event_identifier in event_identifiers:
+            event_definition_id = random.randint(0, 2**16)
+
+            event_definition = open_data_pb2.EventDefinition(
+                identifier=event_identifier,
+                name=event_identifier.split(":")[0],
+                application_name=get_app_from_identifier(event_identifier),
+                description=event_identifier.split(":")[0],
+                definition_id=event_definition_id,
+                priority=open_data_pb2.EVENT_PRIORITY_UNSPECIFIED,
+            )
+            event_definitions.append(event_definition)
+
+        config_id = str(time.time_ns())
+        config_packet = open_data_pb2.ConfigurationPacket(
+            config_id=config_id,
+            parameter_definitions=parameter_definitions,
+            event_definitions=event_definitions,
+        )
+
+        if len(parameter_definitions) != 0 or len(event_definitions) != 0:
+            logger.info(
+                "Adding missing config for %i parameters.", len(parameter_definitions)
+            )
+            logger.info("Adding missing config for %i events.", len(event_definitions))
+            self.add_configration(config_packet)
+
+    def build_parameter_definition_packet(self, name: str, app: str = "StreamAPI"):
+        param_def = open_data_pb2.ParameterDefinition(
+            identifier=f"{name}:{app}",
+            name=name,
+            application_name=app,
+            description="",
+            groups=[""],
+            units="",
+            data_type=open_data_pb2.DATA_TYPE_FLOAT64,
+            format_string="6.3f",
+            max_value=100,
+            min_value=0,
+            warning_min_value=0,
+            warning_max_value=100,
+        )
+        return param_def
+
+
+def get_app_from_identifier(identifier: str):
+    identifier = identifier.split(":")
+    if len(identifier) == 2:
+        return identifier[1]
+    return "StreamAPI"

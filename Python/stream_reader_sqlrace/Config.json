@@ -1,0 +1,6 @@
+{
+    "ipAddress": "127.0.0.1:13579",
+    "dataSource": "Default",
+    "sqlRaceServer": "MCLA-5JRZTQ3\\LOCAL",
+    "sqlRaceDatabase": "SQLRACE01"
+}
