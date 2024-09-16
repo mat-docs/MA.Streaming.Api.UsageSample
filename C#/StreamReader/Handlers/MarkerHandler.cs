@@ -8,10 +8,11 @@ using Stream.Api.Stream.Reader.SqlRace.Mappers;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    public class MarkerHandler(ISqlRaceWriter sessionWriter)
+    internal class MarkerHandler(ISqlRaceWriter sessionWriter) : BaseHandler
     {
         public bool TryHandle(MarkerPacket packet)
         {
+            this.Update();
             var mappedMarker = MarkerPacketToSqlRaceMarkerMapper.MapMarker(packet);
             return sessionWriter.TryWrite(mappedMarker);
         }

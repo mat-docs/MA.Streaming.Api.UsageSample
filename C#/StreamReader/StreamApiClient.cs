@@ -49,6 +49,11 @@ namespace Stream.Api.Stream.Reader
             this.dataFormatManagerServiceClient = RemoteStreamingApiClient.GetDataFormatManagerClient();
         }
 
+        public static void Shutdown()
+        {
+            RemoteStreamingApiClient.Shutdown();
+        }
+
         /// <summary>
         ///     Tries to Read the Stream API current sessions list to see if there is any live sessions mid run when the reader is
         ///     started.
@@ -238,6 +243,15 @@ namespace Stream.Api.Stream.Reader
                 {
                     Connection = connection
                 }).Success ?? false;
+        }
+
+        public GetCurrentSessionsResponse? GetCurrentSessions()
+        {
+            return this.sessionManagementServiceClient?.GetCurrentSessions(
+                new GetCurrentSessionsRequest
+                {
+                    DataSource = this.config.DataSource
+                });
         }
 
         private void OnSessionStart(object? sender, SessionKeyEventArgs e)

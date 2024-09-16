@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 
+using MA.Streaming.Core;
 using MA.Streaming.OpenData;
 
 using Stream.Api.Stream.Reader.Abstractions;
@@ -12,7 +13,7 @@ using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class EventDataHandler
+    internal class EventDataHandler : BaseHandler
     {
         private readonly ConcurrentDictionary<ulong, string> eventIdentifierDataFormatCache = new();
         private readonly ISqlRaceWriter sessionWriter;
@@ -21,6 +22,7 @@ namespace Stream.Api.Stream.Reader.Handlers
         private readonly ConcurrentQueue<EventPacket> eventPacketQueue;
         private readonly EventConfigProcessor configProcessor;
         private readonly EventPacketToSqlRaceEventMapper eventMapper;
+        private readonly TimeAndSizeWindowBatchProcessor<EventPacket> eventProcessor;
 
         public EventDataHandler(
             ISqlRaceWriter sessionWriter,
@@ -36,29 +38,13 @@ namespace Stream.Api.Stream.Reader.Handlers
             this.configProcessor = configProcessor;
             this.configProcessor.ProcessEventComplete += this.OnProcessorProcessEventComplete;
             this.eventMapper = eventMapper;
+            this.eventProcessor = new TimeAndSizeWindowBatchProcessor<EventPacket>(this.ProcessPackets, new CancellationTokenSource(), 1000, 1);
         }
 
         public bool TryHandle(EventPacket packet)
         {
-            var eventIdentifier = packet.DataFormat.HasDataFormatIdentifier
-                ? this.GetEventIdentifier(packet.DataFormat.DataFormatIdentifier)
-                : packet.DataFormat.EventIdentifier;
-
-            if (!this.sessionConfig.IsEventExistInConfig(eventIdentifier))
-            {
-                this.configProcessor.AddEventToConfig(eventIdentifier);
-                this.eventPacketQueue.Enqueue(packet);
-                return false;
-            }
-
-            var mappedEvent = this.eventMapper.MapEvent(packet, eventIdentifier);
-            if (this.sessionWriter.TryWrite(mappedEvent))
-            {
-                return true;
-            }
-
-            this.eventPacketQueue.Enqueue(packet);
-            return false;
+            this.eventProcessor.Add(packet);
+            return true;
         }
 
         private string GetEventIdentifier(ulong dataFormatId)
@@ -82,6 +68,33 @@ namespace Stream.Api.Stream.Reader.Handlers
             {
                 this.TryHandle(packet);
             }
+        }
+
+        private Task ProcessPackets(IReadOnlyList<EventPacket> packets)
+        {
+            foreach (var packet in packets)
+            {
+                this.Update();
+                var eventIdentifier = packet.DataFormat.HasDataFormatIdentifier
+                    ? this.GetEventIdentifier(packet.DataFormat.DataFormatIdentifier)
+                    : packet.DataFormat.EventIdentifier;
+
+                if (!this.sessionConfig.IsEventExistInConfig(eventIdentifier))
+                {
+                    this.configProcessor.AddEventToConfig(eventIdentifier);
+                    this.eventPacketQueue.Enqueue(packet);
+                    continue;
+                }
+
+                var mappedEvent = this.eventMapper.MapEvent(packet, eventIdentifier);
+                if (this.sessionWriter.TryWrite(mappedEvent))
+                {
+                    continue;
+                }
+
+                this.eventPacketQueue.Enqueue(packet);
+            }
+            return Task.CompletedTask;
         }
     }
 }
