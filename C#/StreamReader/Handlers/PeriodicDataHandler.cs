@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 
 using Google.Protobuf.Collections;
 
+using MA.Streaming.Core;
 using MA.Streaming.OpenData;
 
 using Stream.Api.Stream.Reader.Abstractions;
@@ -14,7 +15,7 @@ using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class PeriodicDataHandler
+    internal class PeriodicDataHandler : BaseHandler
     {
         private readonly ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();
         private readonly ConcurrentQueue<PeriodicDataPacket> periodicDataQueue = new();
@@ -23,6 +24,7 @@ namespace Stream.Api.Stream.Reader.Handlers
         private readonly PeriodicConfigProcessor configProcessor;
         private readonly SessionConfig sessionConfig;
         private readonly PeriodicPacketToSqlRaceParameterMapper parameterMapper;
+        private readonly TimeAndSizeWindowBatchProcessor<PeriodicDataPacket> periodicProcessor;
 
         public PeriodicDataHandler(
             ISqlRaceWriter sessionWriter,
@@ -37,43 +39,18 @@ namespace Stream.Api.Stream.Reader.Handlers
             this.configProcessor = configProcessor;
             this.configProcessor.ProcessPeriodicComplete += this.OnProcessPeriodicComplete;
             this.parameterMapper = periodicMapper;
+            this.periodicProcessor = new TimeAndSizeWindowBatchProcessor<PeriodicDataPacket>(this.ProcessPackets, new CancellationTokenSource(), 1000, 1);
         }
 
         public bool TryHandle(PeriodicDataPacket packet)
         {
-            var parameterList = packet.DataFormat.HasDataFormatIdentifier
-                ? this.GetParameterList(packet.DataFormat.DataFormatIdentifier)
-                : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
-
-            var newParameters = parameterList
-                .Where(x => !this.sessionConfig.IsParameterExistInConfig(x, packet.Interval))
-                .ToList();
-
-            if (newParameters.Any())
-            {
-                // If the packet contains new parameters, put it in the list parameters to add to config and queue the packet to process later.
-                foreach (var parameter in newParameters)
-                {
-                    this.configProcessor.AddPeriodicParameterToConfig(new Tuple<string, uint>(parameter, packet.Interval));
-                }
-
-                this.periodicDataQueue.Enqueue(packet);
-                return false;
-            }
-
-            var mappedParameters = this.parameterMapper.MapParameter(packet, parameterList);
-            if (mappedParameters.All(this.sessionWriter.TryWrite))
-            {
-                return true;
-            }
-
-            this.periodicDataQueue.Enqueue(packet);
-            return false;
+            this.periodicProcessor.Add(packet);
+            return true;
         }
 
         private RepeatedField<string> GetParameterList(ulong dataFormatId)
         {
-            if (this.parameterListDataFormatCache.TryGetValue(dataFormatId, out RepeatedField<string>? parameterList))
+            if (this.parameterListDataFormatCache.TryGetValue(dataFormatId, out var parameterList))
             {
                 return parameterList;
             }
@@ -93,6 +70,43 @@ namespace Stream.Api.Stream.Reader.Handlers
             {
                 this.TryHandle(packet);
             }
+        }
+
+        private Task ProcessPackets(IReadOnlyList<PeriodicDataPacket> packets)
+        {
+            foreach (var packet in packets)
+            {
+                this.Update();
+                var parameterList = packet.DataFormat.HasDataFormatIdentifier
+                    ? this.GetParameterList(packet.DataFormat.DataFormatIdentifier)
+                    : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
+
+                var newParameters = parameterList
+                    .Where(x => !this.sessionConfig.IsParameterExistInConfig(x, packet.Interval))
+                    .ToList();
+
+                if (newParameters.Any())
+                {
+                    // If the packet contains new parameters, put it in the list parameters to add to config and queue the packet to process later.
+                    foreach (var parameter in newParameters)
+                    {
+                        this.configProcessor.AddPeriodicParameterToConfig(new Tuple<string, uint>(parameter, packet.Interval));
+                    }
+
+                    this.periodicDataQueue.Enqueue(packet);
+                    continue;
+                }
+
+                var mappedParameters = this.parameterMapper.MapParameter(packet, parameterList);
+                if (mappedParameters.All(this.sessionWriter.TryWrite))
+                {
+                    continue;
+                }
+
+                this.periodicDataQueue.Enqueue(packet);
+            }
+
+            return Task.CompletedTask;
         }
     }
 }

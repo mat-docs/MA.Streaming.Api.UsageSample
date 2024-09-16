@@ -17,6 +17,10 @@ namespace Stream.Api.Stream.Reader.SqlRace
 
         private readonly ConcurrentDictionary<string, EventDefinition> eventDefCache = new();
 
+        private readonly ConcurrentDictionary<string, ErrorDefinition> errorDefCache = new();
+
+        private readonly ConcurrentDictionary<string, uint> synchroParameterChannelIdDictionary = new();
+
         public EventDefinition GetEventDefinition(string eventName)
         {
             return this.eventDefCache[eventName];
@@ -75,6 +79,36 @@ namespace Stream.Api.Stream.Reader.SqlRace
         public void SetParameterChannelId(string parameterName, uint channelId)
         {
             this.channelIdRowParameterDictionary[parameterName] = channelId;
+        }
+
+        public ErrorDefinition GetErrorDefinition(string errorIdentifier)
+        {
+            return this.errorDefCache[errorIdentifier];
+        }
+
+        public uint GetSynchroChannelId(string parameterName)
+        {
+            return this.synchroParameterChannelIdDictionary[parameterName];
+        }
+
+        public bool IsErrorExistInConfig(string errorName)
+        {
+            return this.errorDefCache.ContainsKey(errorName);
+        }
+
+        public bool IsSynchroExistInConfig(string parameterName)
+        {
+            return this.synchroParameterChannelIdDictionary.ContainsKey(parameterName);
+        }
+
+        public void SetErrorDefinition(string errorName, ErrorDefinition errorDefinition)
+        {
+            this.errorDefCache[errorName] = errorDefinition;
+        }
+
+        public void SetSynchroChannelId(string parameterName, uint channelId)
+        {
+            this.synchroParameterChannelIdDictionary[parameterName] = channelId;
         }
     }
 }

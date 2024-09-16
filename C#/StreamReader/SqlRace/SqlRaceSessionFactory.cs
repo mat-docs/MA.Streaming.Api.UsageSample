@@ -33,16 +33,18 @@ namespace Stream.Api.Stream.Reader.SqlRace
                 sessionName,
                 sessionDate,
                 sessionInfo.Type);
-            var configLock = new object();
+            var configLock = new ReaderWriterLockSlim();
             var sessionConfig = new SessionConfig();
             var sessionWriter = new SqlRaceWriter(
-                configLock,
-                new EventSqlRaceWriter(clientSession),
-                new PeriodicSqlRaceWriter(clientSession),
-                new RowSqlRaceWriter(clientSession),
+                new EventSqlRaceWriter(clientSession, configLock),
+                new PeriodicSqlRaceWriter(clientSession, configLock),
+                new RowSqlRaceWriter(clientSession, configLock),
                 new MarkerSqlRaceWriter(clientSession),
                 new LapSqlRaceWriter(clientSession),
-                new SessionInfoWriter(clientSession));
+                new SessionInfoWriter(clientSession),
+                new ErrorSqlRaceWriter(clientSession, configLock),
+                new RawCanSqlRaceWriter(clientSession),
+                new SynchroSqlRaceWriter(clientSession, configLock));
             var packetHandler = new PacketHandler(
                 new PeriodicDataHandler(
                     sessionWriter,
@@ -62,7 +64,19 @@ namespace Stream.Api.Stream.Reader.SqlRace
                     streamApiClient,
                     sessionConfig,
                     new EventConfigProcessor(configManager, defaultConversion, clientSession, configLock, sessionConfig),
-                    new EventPacketToSqlRaceEventMapper(sessionConfig)));
+                    new EventPacketToSqlRaceEventMapper(sessionConfig)),
+                new ErrorDataHandler(
+                    sessionWriter,
+                    sessionConfig,
+                    new ErrorConfigProcessor(configManager, defaultConversion, clientSession, configLock, sessionConfig),
+                    new ErrorPacketToSqlRaceErrorMapper(sessionConfig)),
+                new RawCanDataHandler(sessionWriter),
+                new SynchroDataHandler(
+                    sessionWriter,
+                    streamApiClient,
+                    sessionConfig,
+                    new SynchroConfigProcessor(configManager, defaultConversion, clientSession, configLock, sessionConfig),
+                    new SynchroPacketToSqlRaceSynchroMapper(sessionConfig)));
 
             Console.WriteLine($"New SqlRaceSession is created with name {sessionName}.");
             return new SqlRaceSession(streamApiClient, clientSession, sessionKey, sessionWriter, packetHandler);
