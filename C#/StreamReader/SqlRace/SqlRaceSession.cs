@@ -51,6 +51,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
             this.clientSession.Session.SetStartTime(this.sqlRaceWriter.StartTimestamp);
             this.clientSession.Session.SetEndTime(this.sqlRaceWriter.EndTimestamp);
             this.clientSession.Session.SetSessionTimerange(this.sqlRaceWriter.StartTimestamp, this.sqlRaceWriter.EndTimestamp);
+            this.clientSession.Session.Flush();
             this.clientSession.Session.EndData();
             this.clientSession.Close();
             this.SessionEnded = true;
@@ -85,7 +86,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                                  newStream => new Tuple<string, long>(
                                      newStream,
                                      sessionInfo.TopicPartitionOffsets.GetValueOrDefault(
-                                         $"{sessionInfo.DataSource}.{newStream}:[0]",
+                                         $"{sessionInfo.DataSource}.{newStream}:0",
                                          0))))
                     {
                         streamList.Add(newStreamAndOffset);
