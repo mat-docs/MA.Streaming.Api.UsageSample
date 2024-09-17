@@ -87,7 +87,7 @@ namespace Stream.Api.Stream.Reader.Handlers
                         this.errorDataHandler.TryHandle(errorPacket);
                         break;
                     }
-                    case "RawCanData":
+                    case "RawCANData":
                     {
                         var rawCanPacket = RawCANDataPacket.Parser.ParseFrom(content);
                         this.rawCanDataHandler.TryHandle(rawCanPacket);

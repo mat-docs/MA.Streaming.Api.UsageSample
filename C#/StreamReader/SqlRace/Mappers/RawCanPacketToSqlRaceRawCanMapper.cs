@@ -12,6 +12,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.Mappers
     {
         public static ISqlRaceDto MapRawCan(RawCANDataPacket packet)
         {
+            // In SQL Race 0 is CanType Transmit and 1 is CanType Receive.
             var canTypeBytes = byte.Parse(packet.Type == CanType.Transmit ? "0" : "1");
             return new SqlRaceRawCanDto(packet.Timestamp.ToSqlRaceTime(), (ushort)packet.Bus, packet.CanId, packet.Payload.ToByteArray(), canTypeBytes);
         }

@@ -65,6 +65,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             config.AddConversion(this.DefaultConversion);
 
             var channelsToAdd = new Dictionary<string, uint>();
+            var errorDefToAdd = new Dictionary<string, ErrorDefinition> ();
             foreach (var errorPacket in errorPackets)
             {
                 var parameterGroup = new ParameterGroup(errorPacket.ApplicationName);
@@ -123,7 +124,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
                     // This is the index and not the mask!
                     0);
                 config.AddErrorDefinition(errorDefinition);
-                this.SessionConfig.SetErrorDefinition(errorPacket.Name, errorDefinition);
+                errorDefToAdd[errorPacket.Name] = errorDefinition;
             }
 
             Console.WriteLine($"Commiting config {config.Identifier}.");
@@ -152,6 +153,11 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             foreach (var parameter in channelsToAdd)
             {
                 this.SessionConfig.SetParameterChannelId(parameter.Key, parameter.Value);
+            }
+
+            foreach (var definitions in errorDefToAdd)
+            {
+                this.SessionConfig.SetErrorDefinition(definitions.Key, definitions.Value);
             }
 
             stopwatch.Stop();
