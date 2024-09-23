@@ -77,10 +77,17 @@ namespace Stream.Api.Stream.Reader.Handlers
             foreach (var packet in packets)
             {
                 this.Update();
+                
                 var parameterList = packet.DataFormat.HasDataFormatIdentifier
                     ? this.GetParameterList(packet.DataFormat.DataFormatIdentifier)
                     : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
 
+                if (packet.Interval == 0)
+                {
+                    // There shouldn't be any packets that give you 0 interval.
+                    Console.WriteLine($"The packet containing the parameter {parameterList.First()} has an interval of 0. Ignoring.");
+                    continue;
+                }
                 var newParameters = parameterList
                     .Where(x => !this.sessionConfig.IsParameterExistInConfig(x, packet.Interval))
                     .ToList();

@@ -25,7 +25,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             : base(configurationSetManager, defaultConversion, clientSession, configLock, sessionConfig)
         {
             this.parametersAlreadyProcessed = [];
-            this.synchroConfigProcessor = new TimeAndSizeWindowBatchProcessor<string>(this.ConfigProcessor, new CancellationTokenSource(), 10000, 1000);
+            this.synchroConfigProcessor = new TimeAndSizeWindowBatchProcessor<string>(this.ConfigProcessor, new CancellationTokenSource(), 1000, 100);
         }
 
         public event EventHandler? ProcessSynchroComplete;
@@ -73,9 +73,8 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
                         SupportsRda = false
                     };
                 config.AddGroup(applicationGroup);
-
                 var channelId = this.GenerateUniqueChannelId();
-                channelsToAdd[parameterName] = channelId;
+                channelsToAdd[parameter] = channelId;
                 var parameterChannel = new Channel(
                     channelId,
                     parameter,

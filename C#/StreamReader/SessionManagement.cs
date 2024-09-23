@@ -23,11 +23,9 @@ namespace Stream.Api.Stream.Reader
                     this.CreateAndStartSession(sessionKey);
                 }
             }
-            else
-            {
-                streamApiClient.SessionStart += this.OnSessionStart;
-                streamApiClient.SubscribeToStartSessionNotification();
-            }
+
+            streamApiClient.SessionStart += this.OnSessionStart;
+            streamApiClient.SubscribeToStartSessionNotification();
 
             streamApiClient.SessionStop += this.OnSessionStop;
             streamApiClient.SubscribeToStopNotification();
@@ -179,7 +177,6 @@ namespace Stream.Api.Stream.Reader
         {
             Console.WriteLine($"New Live SqlRaceSession found with key {e.SessionKey}.");
             this.CreateAndStartSession(e.SessionKey);
-            this.sessionKeyDictionary[e.SessionKey].StartSession();
         }
 
         private void OnSessionStop(object? sender, SessionKeyEventArgs e)
