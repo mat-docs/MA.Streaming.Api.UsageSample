@@ -29,6 +29,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
             catch (Exception ex)
             {
                 Console.WriteLine($"Unable to write raw can due to {ex.Message}");
+                Console.WriteLine($"The size of the error message is {rawCanDto.Payload.Length} bytes.");
                 return false;
             }
         }

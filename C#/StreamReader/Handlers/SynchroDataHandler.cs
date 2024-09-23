@@ -39,7 +39,7 @@ namespace Stream.Api.Stream.Reader.Handlers
             this.configProcessor = configProcessor;
             this.configProcessor.ProcessSynchroComplete += this.OnConfigProcessComplete;
             this.synchroMapper = synchroMapper;
-            this.synchroProcessor = new TimeAndSizeWindowBatchProcessor<SynchroDataPacket>(this.ProcessPackets, new CancellationTokenSource(), 1000, 1);
+            this.synchroProcessor = new TimeAndSizeWindowBatchProcessor<SynchroDataPacket>(this.ProcessPackets, new CancellationTokenSource(), 100, 1);
         }
 
         public bool TryHandle(SynchroDataPacket packet)
@@ -57,7 +57,7 @@ namespace Stream.Api.Stream.Reader.Handlers
                     ? this.GetParameterList(packet.DataFormat.DataFormatIdentifier)
                     : packet.DataFormat.ParameterIdentifiers.ParameterIdentifiers;
 
-                var newParameters = parameterList.Where(this.sessionConfig.IsSynchroExistInConfig).ToList();
+                var newParameters = parameterList.Where(x => !this.sessionConfig.IsSynchroExistInConfig(x)).ToList();
                 if (newParameters.Any())
                 {
                     this.synchroDataQueue.Enqueue(packet);

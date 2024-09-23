@@ -54,55 +54,6 @@ namespace Stream.Api.Stream.Reader
             RemoteStreamingApiClient.Shutdown();
         }
 
-        /// <summary>
-        ///     Tries to Read the Stream API current sessions list to see if there is any live sessions mid run when the reader is
-        ///     started.
-        /// </summary>
-        /// <returns>True if a live session is found. Otherwise, it's False.</returns>
-        public bool TryGetLiveSessions(out List<string> sessionKey)
-        {
-            var foundLiveSession = false;
-            sessionKey = [];
-            try
-            {
-                var currentSessionsResponse = this.sessionManagementServiceClient?.GetCurrentSessions(
-                    new GetCurrentSessionsRequest
-                    {
-                        DataSource = this.config.DataSource
-                    });
-
-                if (currentSessionsResponse == null)
-                {
-                    return false;
-                }
-
-                foreach (var session in currentSessionsResponse.SessionKeys.Reverse())
-                {
-                    var sessionInfoResponse = this.GetSessionInfo(session);
-                    if (sessionInfoResponse == null)
-                    {
-                        continue;
-                    }
-
-                    if (sessionInfoResponse.IsComplete)
-                    {
-                        continue;
-                    }
-
-                    Console.WriteLine($"Found Live session {sessionInfoResponse.Identifier}.");
-                    foundLiveSession = true;
-                    sessionKey.Add(session);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Unable to get any current sessions due to {ex.Message}");
-                return false;
-            }
-
-            return foundLiveSession;
-        }
-
         public void SubscribeToStartSessionNotification()
         {
             var startNotificationStream = this.sessionManagementServiceClient?.GetSessionStartNotification(
