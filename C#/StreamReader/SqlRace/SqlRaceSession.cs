@@ -21,6 +21,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
         private readonly ISqlRaceWriter sqlRaceWriter;
         private readonly IClientSession clientSession;
         private readonly IPacketHandler packetHandler;
+        private const byte TriggerSourceStart = 0;
+        private const string DefaultLapName = "Out Lap";
 
         public SqlRaceSession(
             StreamApiClient streamApiClient,
@@ -45,6 +47,13 @@ namespace Stream.Api.Stream.Reader.SqlRace
         {
             var identifier = this.clientSession.Session.Identifier;
             this.streamApiReaders.ForEach(x => x.Stop());
+
+            if (this.clientSession.Session.LapCollection.Count == 0)
+            {
+                var lap = new Lap(this.clientSession.Session.StartTime, 1, TriggerSourceStart, DefaultLapName, false);
+                this.clientSession.Session.LapCollection.Add(lap);
+            }
+
             this.clientSession.Session.EndData();
             this.clientSession.Close();
             this.SessionEnded = true;
