@@ -22,6 +22,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
         private readonly ISqlRaceSessionWriter sqlRaceWriter;
         private readonly IClientSession clientSession;
         private readonly IPacketHandler packetHandler;
+        private const byte TriggerSourceStart = 0;
+        private const string DefaultLapName = "Out Lap";
 
         public SqlRaceSession(
             StreamApiClient streamApiClient,
@@ -44,8 +46,12 @@ namespace Stream.Api.Stream.Reader.SqlRace
 
         public void EndSession()
         {
-            var identifier = this.clientSession.Session.Identifier;
-            this.streamApiReaders.ForEach(x => x.Stop());
+            var identifier = this.clientSession.Session.Identifier;            this.streamApiReaders.ForEach(x => x.Stop());
+            if (this.clientSession.Session.LapCollection.Count == 0)
+            {
+                var lap = new Lap(this.clientSession.Session.StartTime, 1, TriggerSourceStart, DefaultLapName, false);
+                this.clientSession.Session.LapCollection.Add(lap);
+            }
             this.packetHandler.Stop();
             Console.WriteLine($"Setting start and end time to {this.sqlRaceWriter.StartTimestamp.ToDateTime().TimeOfDay} and {this.sqlRaceWriter.EndTimestamp.ToDateTime().TimeOfDay}");
             this.clientSession.Session.SetStartTime(this.sqlRaceWriter.StartTimestamp);
