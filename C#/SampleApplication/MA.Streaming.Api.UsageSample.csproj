@@ -16,6 +16,12 @@
 		<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.0.2.18" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <None Update="Configs\default-values.json">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
 	
 
 </Project>

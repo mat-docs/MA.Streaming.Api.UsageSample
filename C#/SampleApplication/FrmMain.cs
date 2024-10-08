@@ -6,6 +6,7 @@ using System.Text.Json;
 
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
+using MA.Streaming.Api.UsageSample.Configs;
 using MA.Streaming.Api.UsageSample.DataFormatManagement;
 using MA.Streaming.Api.UsageSample.ReadAndWriteManagement;
 using MA.Streaming.Api.UsageSample.SessionManagement;
@@ -17,6 +18,8 @@ using MA.Streaming.Core.Routing;
 using MA.Streaming.Proto.Client.Local;
 using MA.Streaming.Proto.Client.Remote;
 using MA.Streaming.Proto.ServerComponent;
+
+using Prometheus;
 
 using SessionInfo = MA.Streaming.Api.UsageSample.SessionManagement.SessionInfo;
 
@@ -67,7 +70,7 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
         this.rtxtGetParameterListFetchedParameterList.Text = string.Join(Environment.NewLine, responseParameters);
     }
 
-    public void OnMessagesPublished(RunInfo runInfo, uint numberOfPublishedMessages, double maxMessageLatency)
+    public void OnMessagesPublished(RunInfo runInfo, uint numberOfPublishedMessages, double maxMessageLatency, double maxWaitInQueue)
     {
         this.latencyInfos[runInfo.RunId].PublishLatencies.Add(new LatencyRecord(numberOfPublishedMessages, maxMessageLatency));
     }
@@ -223,10 +226,11 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
                             packetReaderManagementClient = StreamingApiClient.GetPacketReaderClient();
                             dataFormatManagementClient = StreamingApiClient.GetDataFormatManagerClient();
                             connectionManagementClient = StreamingApiClient.GetConnectionManagerClient();
+                            new MetricServer(int.Parse(this.numTxtPromtheusPort.Text)).Start();
                         }
                         else
                         {
-                            RemoteStreamingApiClient.Initialise("localhost:13579");
+                            RemoteStreamingApiClient.Initialise(this.txtStreamApiUrl.Text);
                             sessionManagementClient = RemoteStreamingApiClient.GetSessionManagementClient();
                             packetWriterManagementClient = RemoteStreamingApiClient.GetPacketWriterClient();
                             packetReaderManagementClient = RemoteStreamingApiClient.GetPacketReaderClient();
@@ -424,13 +428,91 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
         this.sessionManagementPresenter?.SubscribeStopNotifications(this.txbNotificationDataSource.Text);
     }
 
+    private void chbRemoteKeyGeneratorService_CheckedChanged(object sender, EventArgs e)
+    {
+        if (!this.chbRemoteKeyGeneratorService.Checked)
+        {
+            this.txtKeygenUrl.Clear();
+            this.chbDeployKeyGen.Checked = false;
+            this.txtKeygenUrl.Enabled = false;
+        }
+        else
+        {
+            this.chbDeployKeyGen.Checked = true;
+            this.txtKeygenUrl.Enabled = true;
+        }
+    }
+
+    private void chbDeployStreamApi_CheckedChanged(object sender, EventArgs e)
+    {
+        if (!this.chbDeployStreamApi.Checked)
+        {
+            if (this.txtKafkaAddress.Text == "kafka:9092")
+            {
+                this.txtKafkaAddress.Text = "localhost:9094";
+            }
+
+            if (this.txtKeygenUrl.Text == "key-generator-service:15379")
+            {
+                this.txtKeygenUrl.Text = "localhost:15379";
+            }
+
+            return;
+        }
+
+        if (this.chbDeployKafka.Checked)
+        {
+            this.txtKafkaAddress.Text = "kafka:9092";
+        }
+
+        if (this.chbDeployKeyGen.Checked)
+        {
+            this.txtKeygenUrl.Text = "key-generator-service:15379";
+        }
+    }
+
+    private void chbDeployKeyGen_CheckedChanged(object sender, EventArgs e)
+    {
+        if (!this.chbDeployKeyGen.Checked)
+        {
+            if (this.txtKeygenUrl.Text == "key-generator-service:15379")
+            {
+                this.txtKeygenUrl.Text = "localhost:15379";
+            }
+
+            return;
+        }
+
+        this.txtKeygenUrl.Text = this.chbDeployStreamApi.Checked ? "key-generator-service:15379" : "localhost:15379";
+    }
+
+    private void chbDeployKafka_CheckedChanged(object sender, EventArgs e)
+    {
+        if (!this.chbDeployKafka.Checked)
+        {
+            if (this.txtKafkaAddress.Text == "kafka:9092")
+            {
+                this.txtKafkaAddress.Text = "localhost:9094";
+            }
+
+            return;
+        }
+
+        this.txtKafkaAddress.Text = this.chbDeployStreamApi.Checked ? "kafka:9092" : "localhost:9094";
+    }
+
     #region Deployment
 
     private void chbUseRemoteStreamApi_CheckedChanged(object sender, EventArgs e)
     {
-        if (this.chbDeployKafka.Checked)
+        if (!this.chbUseRemoteStreamApi.Checked)
         {
-            this.txtKafkaAddress.Text = this.chbUseRemoteStreamApi.Checked ? "kafka:9092" : "localhost:9094";
+            this.txtStreamApiUrl.Clear();
+            this.chbDeployStreamApi.Checked = false;
+        }
+        else
+        {
+            this.chbDeployStreamApi.Checked = true;
         }
     }
 
@@ -441,11 +523,45 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
 
     private void Form1_Load(object sender, EventArgs e)
     {
-        this.AddDefaultStreams();
+        this.AddDefaultValues();
     }
 
-    private void AddDefaultStreams()
+    private void AddDefaultValues()
     {
+        if (File.Exists("Configs/default-values.json"))
+        {
+            var defaultValues = JsonSerializer.Deserialize<DefaultValues>(File.ReadAllText("Configs/default-values.json"));
+            this.txtKafkaAddress.Text = defaultValues?.KafkaUri ?? "";
+            if (this.txtKafkaAddress.Text != "kafka:9092")
+            {
+                this.chbDeployKafka.Checked = false;
+            }
+
+            this.rbtTopicBased.Checked = (defaultValues?.Strategy ?? 1) == 2;
+
+            if ((defaultValues?.ApiUri ?? "").StartsWith("localhost"))
+            {
+                this.chbUseRemoteStreamApi.Checked = false;
+                this.chbDeployStreamApi.Checked = false;
+                this.txtStreamApiUrl.Text = defaultValues?.ApiUri ?? "";
+            }
+
+            this.numTxtPromtheusPort.Value = defaultValues?.MetricsPort ?? 0;
+            this.txtKeygenUrl.Text = defaultValues?.KeyGenUri ?? "";
+            if (this.txtKeygenUrl.Text != "key-generator-service:15379")
+            {
+                if (string.IsNullOrEmpty(this.txtKeygenUrl.Text))
+                {
+                    this.chbRemoteKeyGeneratorService.Checked = false;
+                }
+
+                this.chbDeployKeyGen.Checked = false;
+            }
+
+            this.txtPublishStream.Text = defaultValues?.DataPublishStream ?? "Stream1";
+            this.txtPublishSessionKey.Text = defaultValues?.DataPublishKey ?? "test_session";
+        }
+
         this.grdPartitionMappings.Rows.Add(
             "Stream1",
             1);
@@ -479,12 +595,26 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
         new DockerComposeFileGenerator().Generate(
             "Deployment/docker-compose.yml",
             this.chbDeployKafka.Checked,
-            this.chbRemoteKeyGeneratorService.Checked,
-            this.chbUseRemoteStreamApi.Checked,
-            (int)this.numTxtApiPort.Value,
+            this.chbDeployKeyGen.Checked,
+            ExtractPort(this.txtKeygenUrl.Text, 15379),
+            this.chbDeployStreamApi.Checked,
+            ExtractPort(this.txtStreamApiUrl.Text, 13579),
             (int)this.numTxtPromtheusPort.Value);
 
-        MessageBox.Show("Deployment files created");
+        MessageBox.Show(@"Deployment files created");
+    }
+
+    private static int ExtractPort(string url, int defaultPort)
+    {
+        try
+        {
+            var extractPort = int.Parse(url.Split(':')[1]);
+            return extractPort;
+        }
+        catch
+        {
+            return defaultPort;
+        }
     }
 
     private StreamingApiConfiguration? CreateConfiguration()
@@ -516,10 +646,9 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
 
         var batchingResponses = this.chbBatchResponse.Checked;
         var useRemoteKeyGenerator = this.chbRemoteKeyGeneratorService.Checked;
-        var keyGeneratorServiceAddress = this.chbUseRemoteStreamApi.Checked ? "key-generator-service:15379" : "localhost:15379";
+        var keyGeneratorServiceAddress = this.txtKeygenUrl.Text;
         var remoteKeyGeneratorServiceAddress = useRemoteKeyGenerator ? keyGeneratorServiceAddress : "";
-        var streamApiPort = (int)this.numTxtApiPort.Value;
-        var prometheusPort = (int)this.numTxtPromtheusPort.Value;
+        var streamApiPort = ExtractPort(this.txtStreamApiUrl.Text, 13579);
         return new StreamingApiConfiguration(
             streamCreationStrategy,
             brokerUrl,
@@ -530,12 +659,6 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
             useRemoteKeyGenerator,
             remoteKeyGeneratorServiceAddress,
             batchingResponses);
-    }
-
-    private void chbDeployKafka_CheckedChanged(object sender, EventArgs e)
-    {
-        this.txtKafkaAddress.Enabled = !this.chbDeployKafka.Checked;
-        this.chbUseRemoteStreamApi_CheckedChanged(null, null);
     }
 
     private void btnDeploy_Click(object sender, EventArgs e)
