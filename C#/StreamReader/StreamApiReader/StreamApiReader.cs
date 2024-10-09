@@ -4,6 +4,8 @@
 using Grpc.Core;
 
 using MA.Streaming.API;
+using MA.Streaming.Core;
+using MA.Streaming.OpenData;
 
 using Stream.Api.Stream.Reader.Abstractions;
 
@@ -16,6 +18,7 @@ namespace Stream.Api.Stream.Reader.StreamApiReader
         private readonly IPacketHandler packetHandler;
         private readonly StreamApiClient streamApiClient;
         private DateTime lastUpdated;
+        private readonly TimeAndSizeWindowBatchProcessor<Packet> packetProcessor;
 
         public StreamApiReader(Connection connection, IPacketHandler packetHandler, StreamApiClient streamApiClient)
         {
@@ -23,6 +26,7 @@ namespace Stream.Api.Stream.Reader.StreamApiReader
             this.packetHandler = packetHandler;
             this.streamApiClient = streamApiClient;
             this.lastUpdated = DateTime.Now;
+            this.packetProcessor = new TimeAndSizeWindowBatchProcessor<Packet>(this.ProcessPackets, new CancellationTokenSource(), 1000, 1);
         }
 
         public void Start()
@@ -62,7 +66,7 @@ namespace Stream.Api.Stream.Reader.StreamApiReader
                                 var packetResponse = streamReader.Current;
                                 foreach (var response in packetResponse.Response)
                                 {
-                                    this.packetHandler.Handle(response.Packet);
+                                    this.packetProcessor.Add(response.Packet);
                                     this.lastUpdated = DateTime.Now;
                                 }
                             }
@@ -80,6 +84,15 @@ namespace Stream.Api.Stream.Reader.StreamApiReader
             Connection? connectionDetails)
         {
             return this.streamApiClient.CreateReadPacketsStream(connectionDetails);
+        }
+
+        private Task ProcessPackets(IReadOnlyList<Packet> packets)
+        {
+            foreach (var packet in packets)
+            {
+                this.packetHandler.Handle(packet);
+            }
+            return Task.CompletedTask;
         }
     }
 }

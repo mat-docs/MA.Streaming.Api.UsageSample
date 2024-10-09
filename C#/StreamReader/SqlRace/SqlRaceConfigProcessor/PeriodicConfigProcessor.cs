@@ -20,7 +20,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             ConfigurationSetManager configSetManager,
             RationalConversion defaultConversion,
             IClientSession clientSession,
-            object configLock,
+            ReaderWriterLockSlim configLock,
             SessionConfig sessionConfig)
             : base(configSetManager, defaultConversion, clientSession, configLock, sessionConfig)
         {
@@ -58,82 +58,99 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             config.AddConversion(this.DefaultConversion);
 
             var channelsToAdd = new Dictionary<string, Tuple<uint, uint>>();
-            foreach (var parameter in parameterIdentifiers)
+            try
             {
-                var parameterGroup = new ParameterGroup(parameter.Item1.Split(':')[1]);
-                config.AddParameterGroup(parameterGroup);
-                var applicationGroup =
-                    new ApplicationGroup(
-                        parameter.Item1.Split(':')[1],
-                        parameter.Item1.Split(':')[1],
+                foreach (var parameter in parameterIdentifiers)
+                {
+                    var parameterGroup = new ParameterGroup(parameter.Item1.Split(':')[1]);
+                    config.AddParameterGroup(parameterGroup);
+                    var applicationGroup =
+                        new ApplicationGroup(
+                            parameter.Item1.Split(':')[1],
+                            parameter.Item1.Split(':')[1],
+                            new List<string>
+                            {
+                                parameterGroup.Identifier
+                            })
+                        {
+                            SupportsRda = false
+                        };
+                    config.AddGroup(applicationGroup);
+
+                    var channelId = this.GenerateUniqueChannelId();
+                    channelsToAdd[parameter.Item1] = new Tuple<uint, uint>(parameter.Item2, channelId);
+                    var parameterChannel = new Channel(
+                        channelId,
+                        parameter.Item1,
+                        parameter.Item2,
+                        DataType.Double64Bit,
+                        ChannelDataSourceType.Periodic,
+                        parameter.Item1);
+                    config.AddChannel(parameterChannel);
+                    var parameterObj = new Parameter(
+                        parameter.Item1,
+                        parameter.Item1.Split(':')[0],
+                        "",
+                        0,
+                        100,
+                        0,
+                        100,
+                        0.0,
+                        0xFFFF,
+                        0,
+                        "DefaultConversion",
                         new List<string>
                         {
-                            parameterGroup.Identifier
-                        })
-                    {
-                        SupportsRda = false
-                    };
-                config.AddGroup(applicationGroup);
-
-                var channelId = this.GenerateUniqueChannelId();
-                channelsToAdd[parameter.Item1] = new Tuple<uint, uint>(parameter.Item2, channelId);
-                var parameterChannel = new Channel(
-                    channelId,
-                    parameter.Item1,
-                    parameter.Item2,
-                    DataType.Double64Bit,
-                    ChannelDataSourceType.Periodic,
-                    parameter.Item1);
-                config.AddChannel(parameterChannel);
-                var parameterObj = new Parameter(
-                    parameter.Item1,
-                    parameter.Item1.Split(':')[0],
-                    "",
-                    0,
-                    100,
-                    0,
-                    100,
-                    0.0,
-                    0xFFFF,
-                    0,
-                    "DefaultConversion",
-                    new List<string>
-                    {
+                            applicationGroup.Name
+                        },
+                        new List<uint>
+                        {
+                            channelId
+                        },
                         applicationGroup.Name
-                    },
-                    new List<uint>
-                    {
-                        channelId
-                    },
-                    applicationGroup.Name
-                );
-                config.AddParameter(parameterObj);
+                    );
+                    config.AddParameter(parameterObj);
+                }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to create config {configSetIdentifier} for {parameterIdentifiers.Count} periodic parameters due to {ex.Message}.");
+                return Task.CompletedTask;
+            }
+            
 
             Console.WriteLine($"Commiting config {config.Identifier}.");
             try
             {
-                lock (this.ConfigLock)
-                {
-                    config.Commit();
-                }
-
-                this.ClientSession.Session.UseLoggingConfigurationSet(config.Identifier);
-
-                foreach (var parameter in channelsToAdd)
-                {
-                    this.SessionConfig.SetParameterChannelId(parameter.Key, parameter.Value.Item1, parameter.Value.Item2);
-                }
-
-                stopwatch.Stop();
-                Console.WriteLine(
-                    $"Successfully added configuration {config.Identifier} for {parameterIdentifiers.Count} periodic parameters. Time Taken: {stopwatch.ElapsedMilliseconds} ms.");
-                this.ProcessPeriodicComplete?.Invoke(this, EventArgs.Empty);
+                this.ConfigLock.EnterWriteLock();
+                config.Commit();
             }
             catch (ConfigurationSetAlreadyExistsException)
             {
                 Console.WriteLine($"Config {config.Identifier} already exists.");
+                return Task.CompletedTask;
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unable to add Config {config.Identifier} due to {ex.Message}");
+                return Task.CompletedTask;
+            }
+            finally
+            {
+                this.ConfigLock.ExitWriteLock();
+            }
+
+            this.ClientSession.Session.UseLoggingConfigurationSet(config.Identifier);
+
+            foreach (var parameter in channelsToAdd)
+            {
+                this.SessionConfig.SetParameterChannelId(parameter.Key, parameter.Value.Item1, parameter.Value.Item2);
+            }
+
+            stopwatch.Stop();
+            Console.WriteLine(
+                $"Successfully added configuration {config.Identifier} for {parameterIdentifiers.Count} periodic parameters. Time Taken: {stopwatch.ElapsedMilliseconds} ms.");
+            this.ProcessPeriodicComplete?.Invoke(this, EventArgs.Empty);
 
             return Task.CompletedTask;
         }

@@ -17,7 +17,7 @@ internal interface IDataFormatManagementPresenterListener
 
     void OnEventFetched(string dataSource, string responseEvent);
 
-    void OnParameterListDataFormatFetched(string dataSource, IReadOnlyList<string> parameterIdentifiers, ulong dataFormatIdentifier);
+    void OnParameterListDataFormatFetched(string dataSource, IReadOnlyList<string?> parameterIdentifiers, ulong dataFormatIdentifier);
 
     void OnParameterListFetched(string dataSource, IReadOnlyList<string> responseParameters);
 

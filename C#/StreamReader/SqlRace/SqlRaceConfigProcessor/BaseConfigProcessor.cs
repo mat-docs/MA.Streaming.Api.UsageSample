@@ -10,14 +10,14 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
         protected ConfigurationSetManager ConfigurationSetManager;
         protected RationalConversion DefaultConversion;
         protected IClientSession ClientSession;
-        protected object ConfigLock;
+        protected ReaderWriterLockSlim ConfigLock;
         protected SessionConfig SessionConfig;
 
         protected BaseConfigProcessor(
             ConfigurationSetManager configurationSetManager,
             RationalConversion defaultConversion,
             IClientSession clientSession,
-            object configLock,
+            ReaderWriterLockSlim configLock,
             SessionConfig sessionConfig)
         {
             this.ConfigurationSetManager = configurationSetManager;

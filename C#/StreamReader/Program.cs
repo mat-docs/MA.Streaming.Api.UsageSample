@@ -32,21 +32,21 @@ namespace Stream.Api.Stream.Reader
             Console.WriteLine("To start press enter");
             Console.ReadLine();
 
-            // adding run option fetch class 
-            // applying the option 
             SqlRaceInitialiser.Initialise();
             var recorder = new SqlRaceRecorder(config.SQLRaceConnectionString);
             var streamApiClient = new StreamApiClient(config);
             var sessionManager = new SessionManagement(streamApiClient, config);
+            var optionsManager = new OptionsManager(sessionManager);
             recorder.StartRecorder();
             streamApiClient.Initialise();
-            sessionManager.GetLiveSessions();
+            optionsManager.RunOptions();
 
             Console.WriteLine("Press Enter to exit application.");
             Console.ReadLine();
             sessionManager.CloseAllSessions();
             recorder.StopRecorder();
             SqlRaceInitialiser.Shutdown();
+            StreamApiClient.Shutdown();
         }
     }
 }

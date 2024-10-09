@@ -6,5 +6,7 @@ namespace Stream.Api.Stream.Reader.Abstractions
     public interface ISqlRaceDto
     {
         public string DataType { get; }
+
+        public long Timestamp { get; }
     }
 }

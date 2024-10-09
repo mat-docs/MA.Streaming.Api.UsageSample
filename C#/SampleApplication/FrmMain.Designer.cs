@@ -30,22 +30,28 @@
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FrmMain));
             groupBox1 = new GroupBox();
-            label32 = new Label();
+            label34 = new Label();
             numTxtPromtheusPort = new NumericUpDown();
+            label32 = new Label();
+            label33 = new Label();
+            label3 = new Label();
+            chbDeployKeyGen = new CheckBox();
+            chbDeployStreamApi = new CheckBox();
+            txtKeygenUrl = new TextBox();
+            chbUseRemoteStreamApi = new CheckBox();
+            txtStreamApiUrl = new TextBox();
+            label31 = new Label();
             button1 = new Button();
             btnGoToDirectory = new Button();
             btnDeploy = new Button();
             btnCreateDeployFiles = new Button();
             chbBatchResponse = new CheckBox();
-            label3 = new Label();
             chbRemoteKeyGeneratorService = new CheckBox();
             grdPartitionMappings = new DataGridView();
             ColStream = new DataGridViewTextBoxColumn();
             ColPartition = new DataGridViewTextBoxColumn();
-            numTxtApiPort = new NumericUpDown();
             panel1 = new Panel();
             chbDeployKafka = new CheckBox();
-            chbUseRemoteStreamApi = new CheckBox();
             txtKafkaAddress = new TextBox();
             rbtPartitionBased = new RadioButton();
             label2 = new Label();
@@ -155,7 +161,6 @@
             groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numTxtPromtheusPort).BeginInit();
             ((System.ComponentModel.ISupportInitialize)grdPartitionMappings).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numTxtApiPort).BeginInit();
             panel1.SuspendLayout();
             grbSamples.SuspendLayout();
             tabControl1.SuspendLayout();
@@ -186,47 +191,147 @@
             // 
             // groupBox1
             // 
-            groupBox1.Controls.Add(label32);
+            groupBox1.Controls.Add(label34);
             groupBox1.Controls.Add(numTxtPromtheusPort);
+            groupBox1.Controls.Add(label32);
+            groupBox1.Controls.Add(label33);
+            groupBox1.Controls.Add(label3);
+            groupBox1.Controls.Add(chbDeployKeyGen);
+            groupBox1.Controls.Add(chbDeployStreamApi);
+            groupBox1.Controls.Add(txtKeygenUrl);
+            groupBox1.Controls.Add(chbUseRemoteStreamApi);
+            groupBox1.Controls.Add(txtStreamApiUrl);
+            groupBox1.Controls.Add(label31);
             groupBox1.Controls.Add(button1);
             groupBox1.Controls.Add(btnGoToDirectory);
             groupBox1.Controls.Add(btnDeploy);
             groupBox1.Controls.Add(btnCreateDeployFiles);
             groupBox1.Controls.Add(chbBatchResponse);
-            groupBox1.Controls.Add(label3);
             groupBox1.Controls.Add(chbRemoteKeyGeneratorService);
             groupBox1.Controls.Add(grdPartitionMappings);
-            groupBox1.Controls.Add(numTxtApiPort);
             groupBox1.Controls.Add(panel1);
             groupBox1.Dock = DockStyle.Left;
             groupBox1.Location = new Point(0, 0);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(335, 546);
+            groupBox1.Size = new Size(335, 600);
             groupBox1.TabIndex = 0;
             groupBox1.TabStop = false;
             groupBox1.Text = "Deployments";
             // 
-            // label32
+            // label34
             // 
-            label32.AutoSize = true;
-            label32.Location = new Point(10, 360);
-            label32.Name = "label32";
-            label32.Size = new Size(191, 15);
-            label32.TabIndex = 16;
-            label32.Text = "Stream API Promethus Metric Port:";
+            label34.AutoSize = true;
+            label34.Location = new Point(25, 379);
+            label34.Name = "label34";
+            label34.Size = new Size(66, 15);
+            label34.TabIndex = 27;
+            label34.Text = "Metric Port";
             // 
             // numTxtPromtheusPort
             // 
-            numTxtPromtheusPort.Location = new Point(240, 356);
+            numTxtPromtheusPort.Location = new Point(104, 375);
             numTxtPromtheusPort.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
             numTxtPromtheusPort.Name = "numTxtPromtheusPort";
-            numTxtPromtheusPort.Size = new Size(84, 23);
-            numTxtPromtheusPort.TabIndex = 17;
+            numTxtPromtheusPort.Size = new Size(67, 23);
+            numTxtPromtheusPort.TabIndex = 26;
             numTxtPromtheusPort.Value = new decimal(new int[] { 10010, 0, 0, 0 });
+            // 
+            // label32
+            // 
+            label32.AutoSize = true;
+            label32.Location = new Point(63, 453);
+            label32.Name = "label32";
+            label32.Size = new Size(28, 15);
+            label32.TabIndex = 25;
+            label32.Text = "URL";
+            // 
+            // label33
+            // 
+            label33.AutoSize = true;
+            label33.Location = new Point(10, 428);
+            label33.Name = "label33";
+            label33.Size = new Size(81, 15);
+            label33.TabIndex = 24;
+            label33.Text = "Key Generator";
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Location = new Point(63, 348);
+            label3.Name = "label3";
+            label3.Size = new Size(28, 15);
+            label3.TabIndex = 23;
+            label3.Text = "URL";
+            // 
+            // chbDeployKeyGen
+            // 
+            chbDeployKeyGen.AutoSize = true;
+            chbDeployKeyGen.Checked = true;
+            chbDeployKeyGen.CheckState = CheckState.Checked;
+            chbDeployKeyGen.Location = new Point(242, 424);
+            chbDeployKeyGen.Name = "chbDeployKeyGen";
+            chbDeployKeyGen.Size = new Size(63, 19);
+            chbDeployKeyGen.TabIndex = 22;
+            chbDeployKeyGen.Text = "Deploy";
+            chbDeployKeyGen.UseVisualStyleBackColor = true;
+            chbDeployKeyGen.CheckedChanged += chbDeployKeyGen_CheckedChanged;
+            // 
+            // chbDeployStreamApi
+            // 
+            chbDeployStreamApi.AutoSize = true;
+            chbDeployStreamApi.Checked = true;
+            chbDeployStreamApi.CheckState = CheckState.Checked;
+            chbDeployStreamApi.Location = new Point(242, 316);
+            chbDeployStreamApi.Name = "chbDeployStreamApi";
+            chbDeployStreamApi.Size = new Size(63, 19);
+            chbDeployStreamApi.TabIndex = 21;
+            chbDeployStreamApi.Text = "Deploy";
+            chbDeployStreamApi.UseVisualStyleBackColor = true;
+            chbDeployStreamApi.CheckedChanged += chbDeployStreamApi_CheckedChanged;
+            // 
+            // txtKeygenUrl
+            // 
+            txtKeygenUrl.BorderStyle = BorderStyle.FixedSingle;
+            txtKeygenUrl.Location = new Point(104, 449);
+            txtKeygenUrl.Name = "txtKeygenUrl";
+            txtKeygenUrl.Size = new Size(219, 23);
+            txtKeygenUrl.TabIndex = 20;
+            txtKeygenUrl.Text = "key-generator-service:15379";
+            // 
+            // chbUseRemoteStreamApi
+            // 
+            chbUseRemoteStreamApi.AutoSize = true;
+            chbUseRemoteStreamApi.Checked = true;
+            chbUseRemoteStreamApi.CheckState = CheckState.Checked;
+            chbUseRemoteStreamApi.Location = new Point(104, 316);
+            chbUseRemoteStreamApi.Name = "chbUseRemoteStreamApi";
+            chbUseRemoteStreamApi.Size = new Size(67, 19);
+            chbUseRemoteStreamApi.TabIndex = 6;
+            chbUseRemoteStreamApi.Text = "Remote";
+            chbUseRemoteStreamApi.UseVisualStyleBackColor = true;
+            chbUseRemoteStreamApi.CheckedChanged += chbUseRemoteStreamApi_CheckedChanged;
+            // 
+            // txtStreamApiUrl
+            // 
+            txtStreamApiUrl.BorderStyle = BorderStyle.FixedSingle;
+            txtStreamApiUrl.Location = new Point(104, 344);
+            txtStreamApiUrl.Name = "txtStreamApiUrl";
+            txtStreamApiUrl.Size = new Size(219, 23);
+            txtStreamApiUrl.TabIndex = 19;
+            txtStreamApiUrl.Text = "localhost:13579";
+            // 
+            // label31
+            // 
+            label31.AutoSize = true;
+            label31.Location = new Point(26, 317);
+            label31.Name = "label31";
+            label31.Size = new Size(65, 15);
+            label31.TabIndex = 18;
+            label31.Text = "Stream Api";
             // 
             // button1
             // 
-            button1.Location = new Point(169, 511);
+            button1.Location = new Point(169, 571);
             button1.Name = "button1";
             button1.Size = new Size(160, 23);
             button1.TabIndex = 13;
@@ -236,7 +341,7 @@
             // 
             // btnGoToDirectory
             // 
-            btnGoToDirectory.Location = new Point(169, 474);
+            btnGoToDirectory.Location = new Point(169, 534);
             btnGoToDirectory.Name = "btnGoToDirectory";
             btnGoToDirectory.Size = new Size(160, 23);
             btnGoToDirectory.TabIndex = 12;
@@ -246,7 +351,7 @@
             // 
             // btnDeploy
             // 
-            btnDeploy.Location = new Point(6, 511);
+            btnDeploy.Location = new Point(6, 571);
             btnDeploy.Name = "btnDeploy";
             btnDeploy.Size = new Size(153, 23);
             btnDeploy.TabIndex = 11;
@@ -256,7 +361,7 @@
             // 
             // btnCreateDeployFiles
             // 
-            btnCreateDeployFiles.Location = new Point(6, 474);
+            btnCreateDeployFiles.Location = new Point(6, 534);
             btnCreateDeployFiles.Name = "btnCreateDeployFiles";
             btnCreateDeployFiles.Size = new Size(153, 23);
             btnCreateDeployFiles.TabIndex = 10;
@@ -267,33 +372,25 @@
             // chbBatchResponse
             // 
             chbBatchResponse.AutoSize = true;
-            chbBatchResponse.Location = new Point(12, 434);
+            chbBatchResponse.Location = new Point(13, 496);
             chbBatchResponse.Name = "chbBatchResponse";
             chbBatchResponse.Size = new Size(187, 19);
             chbBatchResponse.TabIndex = 9;
             chbBatchResponse.Text = "Use Batching For Read Packets";
             chbBatchResponse.UseVisualStyleBackColor = true;
             // 
-            // label3
-            // 
-            label3.AutoSize = true;
-            label3.Location = new Point(10, 325);
-            label3.Name = "label3";
-            label3.Size = new Size(118, 15);
-            label3.TabIndex = 6;
-            label3.Text = "Stream API RPC Port:";
-            // 
             // chbRemoteKeyGeneratorService
             // 
             chbRemoteKeyGeneratorService.AutoSize = true;
             chbRemoteKeyGeneratorService.Checked = true;
             chbRemoteKeyGeneratorService.CheckState = CheckState.Checked;
-            chbRemoteKeyGeneratorService.Location = new Point(12, 395);
+            chbRemoteKeyGeneratorService.Location = new Point(104, 424);
             chbRemoteKeyGeneratorService.Name = "chbRemoteKeyGeneratorService";
-            chbRemoteKeyGeneratorService.Size = new Size(203, 19);
+            chbRemoteKeyGeneratorService.Size = new Size(67, 19);
             chbRemoteKeyGeneratorService.TabIndex = 8;
-            chbRemoteKeyGeneratorService.Text = "Use Remote KeyGenerator Service";
+            chbRemoteKeyGeneratorService.Text = "Remote";
             chbRemoteKeyGeneratorService.UseVisualStyleBackColor = true;
+            chbRemoteKeyGeneratorService.CheckedChanged += chbRemoteKeyGeneratorService_CheckedChanged;
             // 
             // grdPartitionMappings
             // 
@@ -318,19 +415,9 @@
             ColPartition.HeaderText = "Partition";
             ColPartition.Name = "ColPartition";
             // 
-            // numTxtApiPort
-            // 
-            numTxtApiPort.Location = new Point(240, 321);
-            numTxtApiPort.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
-            numTxtApiPort.Name = "numTxtApiPort";
-            numTxtApiPort.Size = new Size(84, 23);
-            numTxtApiPort.TabIndex = 7;
-            numTxtApiPort.Value = new decimal(new int[] { 13579, 0, 0, 0 });
-            // 
             // panel1
             // 
             panel1.Controls.Add(chbDeployKafka);
-            panel1.Controls.Add(chbUseRemoteStreamApi);
             panel1.Controls.Add(txtKafkaAddress);
             panel1.Controls.Add(rbtPartitionBased);
             panel1.Controls.Add(label2);
@@ -355,23 +442,9 @@
             chbDeployKafka.UseVisualStyleBackColor = true;
             chbDeployKafka.CheckedChanged += chbDeployKafka_CheckedChanged;
             // 
-            // chbUseRemoteStreamApi
-            // 
-            chbUseRemoteStreamApi.AutoSize = true;
-            chbUseRemoteStreamApi.Checked = true;
-            chbUseRemoteStreamApi.CheckState = CheckState.Checked;
-            chbUseRemoteStreamApi.Location = new Point(202, 71);
-            chbUseRemoteStreamApi.Name = "chbUseRemoteStreamApi";
-            chbUseRemoteStreamApi.Size = new Size(110, 19);
-            chbUseRemoteStreamApi.TabIndex = 6;
-            chbUseRemoteStreamApi.Text = "Use Remote Api";
-            chbUseRemoteStreamApi.UseVisualStyleBackColor = true;
-            chbUseRemoteStreamApi.CheckedChanged += chbUseRemoteStreamApi_CheckedChanged;
-            // 
             // txtKafkaAddress
             // 
             txtKafkaAddress.BorderStyle = BorderStyle.FixedSingle;
-            txtKafkaAddress.Enabled = false;
             txtKafkaAddress.Location = new Point(8, 100);
             txtKafkaAddress.Name = "txtKafkaAddress";
             txtKafkaAddress.Size = new Size(313, 23);
@@ -426,7 +499,7 @@
             grbSamples.Enabled = false;
             grbSamples.Location = new Point(335, 0);
             grbSamples.Name = "grbSamples";
-            grbSamples.Size = new Size(1043, 546);
+            grbSamples.Size = new Size(1043, 600);
             grbSamples.TabIndex = 1;
             grbSamples.TabStop = false;
             grbSamples.Text = "Samples (connect  to stream api  to get Enable)";
@@ -440,7 +513,7 @@
             tabControl1.Location = new Point(3, 19);
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
-            tabControl1.Size = new Size(1037, 524);
+            tabControl1.Size = new Size(1037, 578);
             tabControl1.TabIndex = 0;
             // 
             // tabPage1
@@ -459,7 +532,7 @@
             tabPage1.Location = new Point(4, 24);
             tabPage1.Name = "tabPage1";
             tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(1029, 496);
+            tabPage1.Size = new Size(1029, 550);
             tabPage1.TabIndex = 0;
             tabPage1.Text = "Session Management";
             tabPage1.UseVisualStyleBackColor = true;
@@ -469,7 +542,7 @@
             groupBox14.Controls.Add(rtxbNotifications);
             groupBox14.Location = new Point(661, 6);
             groupBox14.Name = "groupBox14";
-            groupBox14.Size = new Size(362, 485);
+            groupBox14.Size = new Size(362, 538);
             groupBox14.TabIndex = 42;
             groupBox14.TabStop = false;
             groupBox14.Text = "Notifications";
@@ -479,7 +552,7 @@
             rtxbNotifications.Location = new Point(6, 24);
             rtxbNotifications.Name = "rtxbNotifications";
             rtxbNotifications.ReadOnly = true;
-            rtxbNotifications.Size = new Size(350, 451);
+            rtxbNotifications.Size = new Size(350, 507);
             rtxbNotifications.TabIndex = 32;
             rtxbNotifications.Text = "";
             // 
@@ -571,7 +644,7 @@
             groupBox6.Controls.Add(label5);
             groupBox6.Location = new Point(316, 307);
             groupBox6.Name = "groupBox6";
-            groupBox6.Size = new Size(339, 184);
+            groupBox6.Size = new Size(339, 237);
             groupBox6.TabIndex = 36;
             groupBox6.TabStop = false;
             groupBox6.Text = "Get Session Info";
@@ -581,7 +654,7 @@
             rtxbSessionInfo.Location = new Point(6, 51);
             rtxbSessionInfo.Name = "rtxbSessionInfo";
             rtxbSessionInfo.ReadOnly = true;
-            rtxbSessionInfo.Size = new Size(328, 123);
+            rtxbSessionInfo.Size = new Size(328, 179);
             rtxbSessionInfo.TabIndex = 32;
             rtxbSessionInfo.Text = "";
             // 
@@ -620,7 +693,7 @@
             groupBox5.Controls.Add(label11);
             groupBox5.Location = new Point(9, 305);
             groupBox5.Name = "groupBox5";
-            groupBox5.Size = new Size(301, 186);
+            groupBox5.Size = new Size(301, 238);
             groupBox5.TabIndex = 35;
             groupBox5.TabStop = false;
             groupBox5.Text = "Get Session Keys";
@@ -630,7 +703,7 @@
             rtxbSessionKeys.Location = new Point(6, 53);
             rtxbSessionKeys.Name = "rtxbSessionKeys";
             rtxbSessionKeys.ReadOnly = true;
-            rtxbSessionKeys.Size = new Size(280, 123);
+            rtxbSessionKeys.Size = new Size(280, 179);
             rtxbSessionKeys.TabIndex = 33;
             rtxbSessionKeys.Text = "";
             // 
@@ -872,7 +945,7 @@
             tabPage2.Location = new Point(4, 24);
             tabPage2.Name = "tabPage2";
             tabPage2.Padding = new Padding(3);
-            tabPage2.Size = new Size(1029, 496);
+            tabPage2.Size = new Size(1029, 550);
             tabPage2.TabIndex = 1;
             tabPage2.Text = "Data Format Management";
             tabPage2.UseVisualStyleBackColor = true;
@@ -886,7 +959,7 @@
             groupBox11.FlatStyle = FlatStyle.Flat;
             groupBox11.Location = new Point(699, 17);
             groupBox11.Name = "groupBox11";
-            groupBox11.Size = new Size(305, 473);
+            groupBox11.Size = new Size(305, 526);
             groupBox11.TabIndex = 37;
             groupBox11.TabStop = false;
             groupBox11.Text = "Get All Definition Packet";
@@ -914,7 +987,7 @@
             rtxtAllDefinitionPackets.Location = new Point(6, 104);
             rtxtAllDefinitionPackets.Name = "rtxtAllDefinitionPackets";
             rtxtAllDefinitionPackets.ReadOnly = true;
-            rtxtAllDefinitionPackets.Size = new Size(293, 358);
+            rtxtAllDefinitionPackets.Size = new Size(293, 414);
             rtxtAllDefinitionPackets.TabIndex = 37;
             rtxtAllDefinitionPackets.Text = "";
             // 
@@ -939,7 +1012,7 @@
             groupBox9.FlatStyle = FlatStyle.Flat;
             groupBox9.Location = new Point(336, 153);
             groupBox9.Name = "groupBox9";
-            groupBox9.Size = new Size(341, 332);
+            groupBox9.Size = new Size(341, 392);
             groupBox9.TabIndex = 36;
             groupBox9.TabStop = false;
             groupBox9.Text = "Get Parameter List";
@@ -949,7 +1022,7 @@
             rtxtGetParameterListFetchedParameterList.Location = new Point(6, 146);
             rtxtGetParameterListFetchedParameterList.Name = "rtxtGetParameterListFetchedParameterList";
             rtxtGetParameterListFetchedParameterList.ReadOnly = true;
-            rtxtGetParameterListFetchedParameterList.Size = new Size(318, 178);
+            rtxtGetParameterListFetchedParameterList.Size = new Size(318, 236);
             rtxtGetParameterListFetchedParameterList.TabIndex = 37;
             rtxtGetParameterListFetchedParameterList.Text = "";
             // 
@@ -1008,7 +1081,7 @@
             groupBox10.FlatStyle = FlatStyle.Flat;
             groupBox10.Location = new Point(12, 153);
             groupBox10.Name = "groupBox10";
-            groupBox10.Size = new Size(318, 332);
+            groupBox10.Size = new Size(318, 390);
             groupBox10.TabIndex = 35;
             groupBox10.TabStop = false;
             groupBox10.Text = "Get Parameter List Data Format Id";
@@ -1021,7 +1094,7 @@
             grdGetParamDataFormatParamList.Name = "grdGetParamDataFormatParamList";
             grdGetParamDataFormatParamList.RowHeadersWidth = 25;
             grdGetParamDataFormatParamList.RowTemplate.Height = 25;
-            grdGetParamDataFormatParamList.Size = new Size(301, 185);
+            grdGetParamDataFormatParamList.Size = new Size(301, 243);
             grdGetParamDataFormatParamList.TabIndex = 18;
             // 
             // ColParamForDataFormat
@@ -1032,7 +1105,7 @@
             // 
             // btnGetParamDataFormat
             // 
-            btnGetParamDataFormat.Location = new Point(91, 274);
+            btnGetParamDataFormat.Location = new Point(91, 330);
             btnGetParamDataFormat.Name = "btnGetParamDataFormat";
             btnGetParamDataFormat.Size = new Size(100, 23);
             btnGetParamDataFormat.TabIndex = 6;
@@ -1052,7 +1125,7 @@
             // txtGetParamDataFormatFetchedDataFormat
             // 
             txtGetParamDataFormatFetchedDataFormat.BorderStyle = BorderStyle.FixedSingle;
-            txtGetParamDataFormatFetchedDataFormat.Location = new Point(6, 303);
+            txtGetParamDataFormatFetchedDataFormat.Location = new Point(6, 359);
             txtGetParamDataFormatFetchedDataFormat.Name = "txtGetParamDataFormatFetchedDataFormat";
             txtGetParamDataFormatFetchedDataFormat.ReadOnly = true;
             txtGetParamDataFormatFetchedDataFormat.Size = new Size(301, 23);
@@ -1214,7 +1287,7 @@
             tabPage3.Location = new Point(4, 24);
             tabPage3.Name = "tabPage3";
             tabPage3.Padding = new Padding(3);
-            tabPage3.Size = new Size(1029, 496);
+            tabPage3.Size = new Size(1029, 550);
             tabPage3.TabIndex = 2;
             tabPage3.Text = "ReadAndWriteManagement";
             tabPage3.UseVisualStyleBackColor = true;
@@ -1233,7 +1306,7 @@
             groupBox12.FlatStyle = FlatStyle.Flat;
             groupBox12.Location = new Point(3, 3);
             groupBox12.Name = "groupBox12";
-            groupBox12.Size = new Size(1023, 490);
+            groupBox12.Size = new Size(1023, 544);
             groupBox12.TabIndex = 33;
             groupBox12.TabStop = false;
             groupBox12.Text = "Publish/Subscribe";
@@ -1252,7 +1325,7 @@
             rtxtRunInfoResults.Location = new Point(460, 258);
             rtxtRunInfoResults.Name = "rtxtRunInfoResults";
             rtxtRunInfoResults.ReadOnly = true;
-            rtxtRunInfoResults.Size = new Size(547, 230);
+            rtxtRunInfoResults.Size = new Size(547, 274);
             rtxtRunInfoResults.TabIndex = 45;
             rtxtRunInfoResults.Text = "";
             // 
@@ -1270,7 +1343,7 @@
             rtxtLog.Location = new Point(3, 258);
             rtxtLog.Name = "rtxtLog";
             rtxtLog.ReadOnly = true;
-            rtxtLog.Size = new Size(317, 229);
+            rtxtLog.Size = new Size(317, 274);
             rtxtLog.TabIndex = 43;
             rtxtLog.Text = "";
             // 
@@ -1280,7 +1353,7 @@
             lstRunInfo.ItemHeight = 15;
             lstRunInfo.Location = new Point(326, 258);
             lstRunInfo.Name = "lstRunInfo";
-            lstRunInfo.Size = new Size(128, 229);
+            lstRunInfo.Size = new Size(128, 274);
             lstRunInfo.TabIndex = 42;
             lstRunInfo.MouseDoubleClick += lstRunInfo_MouseDoubleClick;
             // 
@@ -1454,7 +1527,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1378, 546);
+            ClientSize = new Size(1378, 600);
             Controls.Add(grbSamples);
             Controls.Add(groupBox1);
             Name = "FrmMain";
@@ -1464,7 +1537,6 @@
             groupBox1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)numTxtPromtheusPort).EndInit();
             ((System.ComponentModel.ISupportInitialize)grdPartitionMappings).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numTxtApiPort).EndInit();
             panel1.ResumeLayout(false);
             panel1.PerformLayout();
             grbSamples.ResumeLayout(false);
@@ -1521,10 +1593,8 @@
         private Label label2;
         private RadioButton rbtTopicBased;
         private Label label1;
-        private Label label3;
         private CheckBox chbRemoteKeyGeneratorService;
         private DataGridView grdPartitionMappings;
-        private NumericUpDown numTxtApiPort;
         private Button btnDeploy;
         private Button btnCreateDeployFiles;
         private CheckBox chbDeployKafka;
@@ -1630,11 +1700,19 @@
         private Label label29;
         private Label label30;
         private TextBox txtCompleteSessionSessionKey;
-        private Label label32;
-        private NumericUpDown numTxtPromtheusPort;
         private Button btnSubscribeStartNotifications;
         private Button btnSubscribeStopNotifications;
         private GroupBox groupBox14;
         private RichTextBox rtxbNotifications;
+        private TextBox txtKeygenUrl;
+        private TextBox txtStreamApiUrl;
+        private Label label31;
+        private CheckBox chbDeployKeyGen;
+        private CheckBox chbDeployStreamApi;
+        private Label label32;
+        private Label label33;
+        private Label label3;
+        private NumericUpDown numTxtPromtheusPort;
+        private Label label34;
     }
 }

@@ -9,6 +9,7 @@ internal class DockerComposeFileGenerator
         string filePath,
         bool createKafkaServicePart,
         bool createKeyGeneratorServicePart,
+        int keyGeneratorServicePort,
         bool createStreamApiPart,
         int streamApiRpcPort,
         int prometheusPort)
@@ -26,7 +27,7 @@ services:
 
 {this.CreateKafkaComposePart(createKafkaServicePart)}
 
-{this.CreateKeyGeneratorServicePart(createKeyGeneratorServicePart)}
+{this.CreateKeyGeneratorServicePart(createKeyGeneratorServicePart, keyGeneratorServicePort)}
 
 {this.CreateKeyStreamApiPart(createStreamApiPart, createKafkaServicePart, createKeyGeneratorServicePart, streamApiRpcPort, prometheusPort)}
 ";
@@ -72,17 +73,17 @@ services:
 ";
     }
 
-    private string CreateKeyGeneratorServicePart(bool keyGeneratorServicePart)
+    private string CreateKeyGeneratorServicePart(bool keyGeneratorServicePart, int port)
     {
         return !keyGeneratorServicePart
             ? string.Empty
-            : @"
+            : @$"
   key-generator-service:
     image: mclarenapplied/keygenerator-proto-server:latest
     ports:    
-      - 15379:15379
+      - {port}:{port}
     environment:
-      PORT: 15379
+      PORT: {port}
 ";
     }
 

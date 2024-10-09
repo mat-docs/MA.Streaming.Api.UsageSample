@@ -19,7 +19,7 @@ internal interface IReadAndWriteManagementPresenterListener
 
     void OnMessagesReceived(RunInfo runInfo, uint numberOfReceivedMessages, double maxMessageLatency);
 
-    void OnMessagesPublished(RunInfo runInfo, uint numberOfPublishedMessages, double maxMessageLatency);
+    void OnMessagesPublished(RunInfo runInfo, uint numberOfPublishedMessages, double maxMessageLatency, double maxWaitInQueue);
 
     void OnReceiveComplete(RunInfo runInfo);
 
@@ -32,7 +32,8 @@ internal class ReadAndWriteManagementPresenter
     private readonly PacketReaderService.PacketReaderServiceClient readerServiceClient;
     private readonly ConnectionManagerService.ConnectionManagerServiceClient connectionManagerServiceClient;
     private readonly IReadAndWriteManagementPresenterListener listener;
-    private readonly TimeAndSizeWindowBatchProcessor<DataPacketDetails> timeWindowBatchProcessor;
+    private readonly TimeAndSizeWindowBatchProcessor<DataPacketDetails> publishTimeWindowBatchProcessor;
+    private readonly TimeAndSizeWindowBatchProcessor<ReadPacketsResponse> receiveTimeWindowBatchProcessor;
     private readonly Dictionary<long, RunInfo> runInfos = new();
     private Connection? receivingConnection;
     private IAsyncStreamReader<ReadPacketsResponse>? readerStream;
@@ -48,7 +49,12 @@ internal class ReadAndWriteManagementPresenter
         this.readerServiceClient = readerServiceClient;
         this.connectionManagerServiceClient = connectionManagerServiceClient;
         this.listener = listener;
-        this.timeWindowBatchProcessor = new TimeAndSizeWindowBatchProcessor<DataPacketDetails>(this.WriteBatchPackets, new CancellationTokenSource());
+        this.publishTimeWindowBatchProcessor = new TimeAndSizeWindowBatchProcessor<DataPacketDetails>(
+            this.WriteBatchPackets,
+            new CancellationTokenSource(),
+            batchSize: 100000,
+            timeWindowSize: 5);
+        this.receiveTimeWindowBatchProcessor = new TimeAndSizeWindowBatchProcessor<ReadPacketsResponse>(this.ProcessReceive, new CancellationTokenSource());
     }
 
     public void Publish(string dataSource, string stream, string sessionKey, uint numberOfMessageToPublish, uint messageSize)
@@ -72,7 +78,62 @@ internal class ReadAndWriteManagementPresenter
                         }
                     };
                     await runInfo.Publish(writeDataPacketsRequest);
-                    this.listener.OnMessagesPublished(runInfo, 1, (DateTime.Now - sampleCustomObject.CreationTime).TotalMilliseconds);
+                    this.listener.OnMessagesPublished(runInfo, 1, (DateTime.Now - sampleCustomObject.CreationTime).TotalMilliseconds, 0);
+                }
+            });
+    }
+
+    public void PublishUsingBatching(string dataSource, string stream, string sessionKey, uint numberOfMessageToPublish, uint messageSize)
+    {
+        this.InitialiseReaderStream(dataSource, stream, sessionKey);
+        var runInfo = this.CreateRunInfoAndInsertInToRunInfos(dataSource, stream, sessionKey, numberOfMessageToPublish, messageSize);
+        this.StartRunInfo(runInfo);
+        Task.Delay(50).Wait();
+        this.listener.OnRunStarted(runInfo);
+        _ = Task.Run(
+            () =>
+            {
+                for (var i = 0; i < numberOfMessageToPublish; i++)
+                {
+                    var sampleCustomObject = new SampleCustomObject(runInfo.RunId, (uint)i, messageSize);
+                    this.publishTimeWindowBatchProcessor.Add(CreateDataPacketDetail(runInfo.RunId, dataSource, stream, sessionKey, sampleCustomObject));
+                }
+            });
+    }
+
+    public void StartListening()
+    {
+        if (this.readerStream is null)
+        {
+            return;
+        }
+
+        _ = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    while (true)
+                    {
+                        while (await this.readerStream.MoveNext())
+                        {
+                            try
+                            {
+                                var readPacketsResponse = this.readerStream.Current;
+                                this.receiveTimeWindowBatchProcessor.Add(readPacketsResponse);
+                            }
+                            catch (Exception ex)
+                            {
+                                await File.AppendAllTextAsync("log.txt", ex.ToString());
+                            }
+                        }
+
+                        Task.Delay(10).Wait();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await File.AppendAllTextAsync("log.txt", ex.ToString());
                 }
             });
     }
@@ -113,29 +174,21 @@ internal class ReadAndWriteManagementPresenter
         this.readerStreamInitialised = true;
     }
 
-    public void PublishUsingBatching(string dataSource, string stream, string sessionKey, uint numberOfMessageToPublish, uint messageSize)
-    {
-        this.InitialiseReaderStream(dataSource, stream, sessionKey);
-        var runInfo = this.CreateRunInfoAndInsertInToRunInfos(dataSource, stream, sessionKey, numberOfMessageToPublish, messageSize);
-        this.StartRunInfo(runInfo);
-        Task.Delay(50).Wait();
-        this.listener.OnRunStarted(runInfo);
-        _ = Task.Run(
-            () =>
-            {
-                for (var i = 0; i < numberOfMessageToPublish; i++)
-                {
-                    var sampleCustomObject = new SampleCustomObject(runInfo.RunId, (uint)i, messageSize);
-                    this.timeWindowBatchProcessor.Add(CreateDataPacketDetail(runInfo.RunId, dataSource, stream, sessionKey, sampleCustomObject));
-                }
-            });
-    }
-
     private async Task WriteBatchPackets(IReadOnlyList<DataPacketDetails> dataPacketDetailsList)
     {
         try
         {
-            var runInfo = this.runInfos[long.Parse(dataPacketDetailsList[0].Message.SessionKey)];
+            var messageSessionKey = dataPacketDetailsList[0].Message.SessionKey;
+            var firstItem = SampleCustomObject.Deserialize(dataPacketDetailsList[0].Message.Content.ToByteArray());
+            var runInfo = this.runInfos[long.Parse(messageSessionKey)];
+            var updatedTimeMessage = new SampleCustomObject(runInfo.RunId, firstItem.Order, (uint)firstItem.Content.Length);
+            dataPacketDetailsList[0].Message = new Packet
+            {
+                SessionKey = runInfo.RunId.ToString(),
+                Content = ByteString.CopyFrom(updatedTimeMessage.Serialize()),
+                IsEssential = false,
+                Type = nameof(updatedTimeMessage)
+            };
             var writeDataPacketsRequest = new WriteDataPacketsRequest
             {
                 Details =
@@ -144,8 +197,38 @@ internal class ReadAndWriteManagementPresenter
                 }
             };
             await runInfo.Publish(writeDataPacketsRequest);
-            var sampleCustomObject = SampleCustomObject.Deserialize(dataPacketDetailsList[0].Message.Content.ToByteArray());
-            this.listener.OnMessagesPublished(runInfo, 1, (DateTime.Now - sampleCustomObject.CreationTime).TotalMilliseconds);
+            this.listener.OnMessagesPublished(
+                runInfo,
+                1,
+                (DateTime.Now - updatedTimeMessage.CreationTime).TotalMilliseconds,
+                (DateTime.Now - firstItem.CreationTime).TotalMilliseconds);
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+        }
+    }
+
+    private async Task ProcessReceive(IReadOnlyList<ReadPacketsResponse> responses)
+    {
+        try
+        {
+            foreach (var readPacketsResponse in responses)
+            {
+                if (!long.TryParse(readPacketsResponse.Response[0].Packet.SessionKey, out var runId))
+                {
+                    continue;
+                }
+
+                if (!this.runInfos.TryGetValue(runId, out var runInfo))
+                {
+                    continue;
+                }
+
+                runInfo.OnMessageReceived(readPacketsResponse);
+            }
+
             await Task.CompletedTask;
         }
         catch (Exception ex)
@@ -226,53 +309,5 @@ internal class ReadAndWriteManagementPresenter
                 Type = nameof(sampleCustomObject)
             }
         };
-    }
-
-    public void StartListening()
-    {
-        if (this.readerStream is null)
-        {
-            return;
-        }
-
-        _ = Task.Run(
-            async () =>
-            {
-                try
-                {
-                    while (true)
-                    {
-                        while (await this.readerStream.MoveNext())
-                        {
-                            try
-                            {
-                                var readPacketsResponse = this.readerStream.Current;
-
-                                if (!long.TryParse(readPacketsResponse.Response[0].Packet.SessionKey, out var runId))
-                                {
-                                    continue;
-                                }
-
-                                if (!this.runInfos.TryGetValue(runId, out var runInfo))
-                                {
-                                    continue;
-                                }
-
-                                runInfo.OnMessageReceived(readPacketsResponse);
-                            }
-                            catch (Exception ex)
-                            {
-                                await File.AppendAllTextAsync("log.txt", ex.ToString());
-                            }
-                        }
-
-                        Task.Delay(10).Wait();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    await File.AppendAllTextAsync("log.txt", ex.ToString());
-                }
-            });
     }
 }
