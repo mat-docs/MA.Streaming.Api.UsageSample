@@ -14,6 +14,7 @@ import time
 import logging
 
 import grpc
+from google.protobuf import wrappers_pb2, any_pb2
 
 from ma.streaming.api.v1 import api_pb2
 from ma.streaming.open_data.v1 import open_data_pb2
@@ -117,7 +118,33 @@ def main():
         #     )
         # )
         # logger.info("Configuration packet published. Id: %s", config_id)
-        #
+        # 
+
+        # Write a metadata packet
+        driver_string = wrappers_pb2.StringValue(value="Tom")
+        any_msg = any_pb2.Any()
+        any_msg.Pack(driver_string)
+        meta_packet = open_data_pb2.MetadataPacket()
+        meta_packet.metadata["Driver"].CopyFrom(any_msg)
+
+        packet_type = get_packet_type(meta_packet)
+        message = open_data_pb2.Packet(
+            type=packet_type,
+            session_key=session_key,
+            is_essential=True,
+            content=meta_packet.SerializeToString(),
+        )
+        packet_writer_stub.WriteDataPacket(
+            request=api_pb2.WriteDataPacketRequest(
+                detail=api_pb2.DataPacketDetails(
+                    message=message,
+                    data_source=DATA_SOURCE,
+                    session_key=session_key,
+                )
+            )
+        )
+        logger.info("Metadata packet published.")
+
         # Generate the data format id, which corresponds to the list of parameter
         # identifiers.
         data_format_id_response = data_format_stub.GetParameterDataFormatId(
