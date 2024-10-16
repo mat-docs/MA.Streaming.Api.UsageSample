@@ -95,30 +95,29 @@ def main():
     print(f"Version: {session_info_response.version}")
     print(f"is_complete: {session_info_response.is_complete}")
     try:
-        # # Build and publish the configuration packet
-        # config_id = get_new_key_string()
-        # config_packet = sin_wave_generator.build_configuration_packet(
-        #     config_id=config_id
-        # )
-        # packet_type = get_packet_type(config_packet)
-        # message = open_data_pb2.Packet(
-        #     type=packet_type,
-        #     session_key=session_key,
-        #     is_essential=True,
-        #     content=config_packet.SerializeToString(),
-        # )
-        # packet_writer_stub.WriteDataPacket(
-        #     request=api_pb2.WriteDataPacketRequest(
-        #         detail=api_pb2.DataPacketDetails(
-        #             message=message,
-        #             data_source=DATA_SOURCE,
-        #             stream=STREAM,
-        #             session_key=session_key,
-        #         )
-        #     )
-        # )
-        # logger.info("Configuration packet published. Id: %s", config_id)
-        # 
+        # Build and publish the configuration packet
+        config_id = get_new_key_string()
+        config_packet = sin_wave_generator.build_configuration_packet(
+            config_id=config_id
+        )
+        packet_type = get_packet_type(config_packet)
+        message = open_data_pb2.Packet(
+            type=packet_type,
+            session_key=session_key,
+            is_essential=True,
+            content=config_packet.SerializeToString(),
+        )
+        packet_writer_stub.WriteDataPacket(
+            request=api_pb2.WriteDataPacketRequest(
+                detail=api_pb2.DataPacketDetails(
+                    message=message,
+                    data_source=DATA_SOURCE,
+                    stream=STREAM,
+                    session_key=session_key,
+                )
+            )
+        )
+        logger.info("Configuration packet published. Id: %s", config_id)
 
         # Write a metadata packet
         driver_string = wrappers_pb2.StringValue(value="Tom")
