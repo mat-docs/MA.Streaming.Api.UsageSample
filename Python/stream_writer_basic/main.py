@@ -107,12 +107,13 @@ def main():
             is_essential=True,
             content=config_packet.SerializeToString(),
         )
+        # Note that `stream` is omitted when publishing config packets, so it gets
+        # published to the main stream and the essentials stream.
         packet_writer_stub.WriteDataPacket(
             request=api_pb2.WriteDataPacketRequest(
                 detail=api_pb2.DataPacketDetails(
                     message=message,
                     data_source=DATA_SOURCE,
-                    stream=STREAM,
                     session_key=session_key,
                 )
             )
@@ -133,6 +134,8 @@ def main():
             is_essential=True,
             content=meta_packet.SerializeToString(),
         )
+        # Note that `stream` is omitted when publishing metadata packets, so it gets
+        # published to the main stream and the essentials stream.
         packet_writer_stub.WriteDataPacket(
             request=api_pb2.WriteDataPacketRequest(
                 detail=api_pb2.DataPacketDetails(
