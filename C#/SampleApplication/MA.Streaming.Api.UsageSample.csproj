@@ -11,10 +11,15 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Docker.DotNet" Version="3.125.15" />
-		<PackageReference Include="MA.Streaming.Core" Version="1.*" />
-		<PackageReference Include="MA.Streaming.Proto.Client.Local" Version="1.*" />
-		<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.*" />
+		<PackageReference Include="MA.Streaming.Core" Version="1.0.2.18" />
+		<PackageReference Include="MA.Streaming.Proto.Client.Local" Version="1.0.2.18" />
+		<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.0.2.18" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="Configs\default-values.json">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
 	</ItemGroup>
 
 	

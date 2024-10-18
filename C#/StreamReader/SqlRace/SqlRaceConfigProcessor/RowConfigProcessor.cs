@@ -20,7 +20,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             ConfigurationSetManager configurationSetManager,
             RationalConversion defaultConversion,
             IClientSession clientSession,
-            object configLock,
+            ReaderWriterLockSlim configLock,
             SessionConfig sessionConfig)
             : base(
                 configurationSetManager,
@@ -40,7 +40,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 
         public event EventHandler? ProcessRowComplete;
 
-        public void AddParameterToConfig(List<string> parameterList)
+        public void AddParameterToConfig(IReadOnlyList<string> parameterList)
         {
             var newParameters = parameterList.Where(x => !this.parametersProcessed.Contains(x)).ToList();
             if (!newParameters.Any())
@@ -56,7 +56,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             this.rowConfigProcessor.Add(newParameters);
         }
 
-        private Task ProcessRowConfig(IReadOnlyList<List<string>> parameterIdentifiers)
+        private Task ProcessRowConfig(IReadOnlyList<IReadOnlyList<string>> parameterIdentifiers)
         {
             var stopwatch = new Stopwatch();
             stopwatch.Start();
@@ -124,27 +124,35 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             Console.WriteLine($"Commiting config {config.Identifier}.");
             try
             {
-                lock (this.ConfigLock)
-                {
-                    config.Commit();
-                }
-
-                this.ClientSession.Session.UseLoggingConfigurationSet(config.Identifier);
-
-                foreach (var parameter in channelsToAdd)
-                {
-                    this.SessionConfig.SetParameterChannelId(parameter.Key, parameter.Value);
-                }
-
-                stopwatch.Stop();
-                Console.WriteLine(
-                    $"Successfully added configuration {config.Identifier} for {parameterIdentifiers.Count} row parameters. Time taken: {stopwatch.ElapsedMilliseconds} ms.");
-                this.ProcessRowComplete?.Invoke(this, EventArgs.Empty);
+                this.ConfigLock.EnterWriteLock();
+                config.Commit();
             }
             catch (ConfigurationSetAlreadyExistsException)
             {
                 Console.WriteLine($"Config {config.Identifier} already exists.");
+                return Task.CompletedTask;
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unable to write config {config.Identifier} due to {ex.Message}");
+                return Task.CompletedTask;
+            }
+            finally
+            {
+                this.ConfigLock.ExitWriteLock();
+            }
+
+            this.ClientSession.Session.UseLoggingConfigurationSet(config.Identifier);
+
+            foreach (var parameter in channelsToAdd)
+            {
+                this.SessionConfig.SetParameterChannelId(parameter.Key, parameter.Value);
+            }
+
+            stopwatch.Stop();
+            Console.WriteLine(
+                $"Successfully added configuration {config.Identifier} for {parameterIdentifiers.Count} row parameters. Time taken: {stopwatch.ElapsedMilliseconds} ms.");
+            this.ProcessRowComplete?.Invoke(this, EventArgs.Empty);
 
             return Task.CompletedTask;
         }

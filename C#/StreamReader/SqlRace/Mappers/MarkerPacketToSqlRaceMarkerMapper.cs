@@ -19,7 +19,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.Mappers
                     (short)packet.Value,
                     packet.Timestamp.ToSqlRaceTime(),
                     true,
-                    BitConverter.GetBytes(0)[0]);
+                    byte.Parse(packet.Source));
             }
 
             return new SqlRaceMarkerDto(packet.Label, packet.Timestamp.ToSqlRaceTime());

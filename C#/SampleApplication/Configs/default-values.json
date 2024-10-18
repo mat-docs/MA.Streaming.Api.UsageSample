@@ -1,0 +1,9 @@
+{
+  "Strategy": 1,
+  "KafkaUri": "",
+  "ApiUri": "10.102.40.14:13579",
+  "MetricsPort": 0,
+  "KeyGenUri": "",
+  "DataPublishStream": "Stream1",
+  "DataPublishKey": "test_session"
+}
