@@ -5,24 +5,24 @@ using System.Collections.Concurrent;
 
 using Google.Protobuf.Collections;
 
+using MA.DataPlatforms.DataRecorder.SqlRaceWriter.Abstractions;
 using MA.Streaming.Core;
 using MA.Streaming.OpenData;
 
 using Stream.Api.Stream.Reader.Abstractions;
 using Stream.Api.Stream.Reader.SqlRace;
 using Stream.Api.Stream.Reader.SqlRace.Mappers;
-using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class SynchroDataHandler : BaseHandler
+    internal class SynchroDataHandler : BaseHandler<SynchroDataPacket>
     {
         private readonly ConcurrentQueue<SynchroDataPacket> synchroDataQueue = new();
         private readonly ConcurrentDictionary<ulong, RepeatedField<string>> parameterListDataFormatCache = new();
         private readonly ISqlRaceWriter sessionWriter;
         private readonly StreamApiClient streamApiClient;
         private readonly SessionConfig sessionConfig;
-        private readonly SynchroConfigProcessor configProcessor;
+        private readonly IConfigProcessor<IReadOnlyList<string>> configProcessor;
         private readonly SynchroPacketToSqlRaceSynchroMapper synchroMapper;
         private readonly TimeAndSizeWindowBatchProcessor<SynchroDataPacket> synchroProcessor;
 
@@ -30,22 +30,21 @@ namespace Stream.Api.Stream.Reader.Handlers
             ISqlRaceWriter sessionWriter,
             StreamApiClient streamApiClient,
             SessionConfig sessionConfig,
-            SynchroConfigProcessor configProcessor,
+            IConfigProcessor<IReadOnlyList<string>> configProcessor,
             SynchroPacketToSqlRaceSynchroMapper synchroMapper)
         {
             this.sessionWriter = sessionWriter;
             this.streamApiClient = streamApiClient;
             this.sessionConfig = sessionConfig;
             this.configProcessor = configProcessor;
-            this.configProcessor.ProcessSynchroComplete += this.OnConfigProcessComplete;
+            this.configProcessor.ProcessCompleted += this.OnConfigProcessComplete;
             this.synchroMapper = synchroMapper;
             this.synchroProcessor = new TimeAndSizeWindowBatchProcessor<SynchroDataPacket>(this.ProcessPackets, new CancellationTokenSource(), 100, 1);
         }
 
-        public bool TryHandle(SynchroDataPacket packet)
+        public override void Handle(SynchroDataPacket packet)
         {
             this.synchroProcessor.Add(packet);
-            return true;
         }
 
         private Task ProcessPackets(IReadOnlyList<SynchroDataPacket> packetList)
@@ -61,7 +60,7 @@ namespace Stream.Api.Stream.Reader.Handlers
                 if (newParameters.Any())
                 {
                     this.synchroDataQueue.Enqueue(packet);
-                    this.configProcessor.AddSynchroParameterToConfig(parameterList);
+                    this.configProcessor.AddToConfig(parameterList);
                     continue;
                 }
 
@@ -95,7 +94,7 @@ namespace Stream.Api.Stream.Reader.Handlers
             this.synchroDataQueue.Clear();
             foreach (var packet in packetCopy)
             {
-                this.TryHandle(packet);
+                this.Handle(packet);
             }
         }
     }

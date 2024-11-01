@@ -2,6 +2,7 @@
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
 using MA.Streaming.API;
+using MA.Streaming.OpenData;
 
 using MESL.SqlRace.Common.Extensions;
 using MESL.SqlRace.Domain;
@@ -21,7 +22,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
         private readonly Dictionary<string, long> streamsOffsetDictionary;
         private readonly ISqlRaceSessionWriter sqlRaceWriter;
         private readonly IClientSession clientSession;
-        private readonly IPacketHandler packetHandler;
+        private readonly IPacketHandler<Packet> packetHandler;
         private const byte TriggerSourceStart = 0;
         private const string DefaultLapName = "Out Lap";
 
@@ -30,7 +31,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
             IClientSession clientSession,
             string sessionKey,
             ISqlRaceSessionWriter sqlRaceWriter,
-            IPacketHandler packetHandler)
+            IPacketHandler<Packet> packetHandler)
         {
             this.streamApiClient = streamApiClient;
             this.streamApiReaders = [];

@@ -38,14 +38,27 @@ namespace Stream.Api.Stream.Reader.Handlers
                             }
                         }
                     }
+                    catch (RpcException ex) when (ex.Status.StatusCode == StatusCode.Cancelled)
+                    {
+                        Console.WriteLine("Session Stop Notification has been cancelled.");
+                    }
                     catch (Exception)
                     {
                         Console.WriteLine(
                             $"Failed to stop session with session key {stopNotificationStream.Current?.SessionKey}.");
+                        this.tokenSource.Cancel();
+                    }
+                    finally
+                    {
                         this.tokenSource.Dispose();
                     }
                 },
                 cancellationToken);
+        }
+
+        public void Stop()
+        {
+            this.tokenSource.Cancel();
         }
     }
 }
