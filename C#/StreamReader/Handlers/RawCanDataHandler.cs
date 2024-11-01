@@ -8,7 +8,7 @@ using Stream.Api.Stream.Reader.SqlRace.Mappers;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class RawCanDataHandler : BaseHandler
+    internal class RawCanDataHandler : BaseHandler<RawCANDataPacket>
     {
         private readonly ISqlRaceWriter sessionWriter;
 
@@ -17,11 +17,11 @@ namespace Stream.Api.Stream.Reader.Handlers
             this.sessionWriter = sessionWriter;
         }
 
-        public bool TryHandle(RawCANDataPacket packet)
+        public override void Handle(RawCANDataPacket packet)
         {
             this.Update();
             var dto = RawCanPacketToSqlRaceRawCanMapper.MapRawCan(packet);
-            return this.sessionWriter.TryWrite(dto);
+            this.sessionWriter.TryWrite(dto);
         }
     }
 }

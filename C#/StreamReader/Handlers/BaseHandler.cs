@@ -1,24 +1,28 @@
 ﻿// <copyright file="BaseHandler.cs" company="McLaren Applied Ltd.">
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
+using Stream.Api.Stream.Reader.Abstractions;
+
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class BaseHandler
+    internal abstract class BaseHandler<T> : IPacketHandler<T>
     {
-        private DateTime lastUpdated = DateTime.Now;
+        private DateTime lastUpdated = DateTime.UtcNow;
 
-        public void Stop()
+        public abstract void Handle(T packet);
+
+        public virtual void Stop()
         {
             do
             {
                 Task.Delay(1000).Wait();
             }
-            while (DateTime.Now - this.lastUpdated < TimeSpan.FromSeconds(10));
+            while (DateTime.UtcNow - this.lastUpdated < TimeSpan.FromSeconds(10));
         }
 
         protected void Update()
         {
-            this.lastUpdated = DateTime.Now;
+            this.lastUpdated = DateTime.UtcNow;
         }
     }
 }

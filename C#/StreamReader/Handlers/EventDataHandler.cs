@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 
+using MA.DataPlatforms.DataRecorder.SqlRaceWriter.Abstractions;
 using MA.Streaming.Core;
 using MA.Streaming.OpenData;
 
@@ -13,14 +14,14 @@ using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class EventDataHandler : BaseHandler
+    internal class EventDataHandler : BaseHandler<EventPacket>
     {
         private readonly ConcurrentDictionary<ulong, string> eventIdentifierDataFormatCache = new();
         private readonly ISqlRaceWriter sessionWriter;
         private readonly StreamApiClient streamApiClient;
         private readonly SessionConfig sessionConfig;
         private readonly ConcurrentQueue<EventPacket> eventPacketQueue;
-        private readonly EventConfigProcessor configProcessor;
+        private readonly IConfigProcessor<string> configProcessor;
         private readonly EventPacketToSqlRaceEventMapper eventMapper;
         private readonly TimeAndSizeWindowBatchProcessor<EventPacket> eventProcessor;
 
@@ -36,15 +37,14 @@ namespace Stream.Api.Stream.Reader.Handlers
             this.sessionConfig = sessionConfig;
             this.eventPacketQueue = [];
             this.configProcessor = configProcessor;
-            this.configProcessor.ProcessEventComplete += this.OnProcessorProcessEventComplete;
+            this.configProcessor.ProcessCompleted += this.OnProcessorProcessCompleted;
             this.eventMapper = eventMapper;
             this.eventProcessor = new TimeAndSizeWindowBatchProcessor<EventPacket>(this.ProcessPackets, new CancellationTokenSource(), 1000, 1);
         }
 
-        public bool TryHandle(EventPacket packet)
+        public override void Handle(EventPacket packet)
         {
             this.eventProcessor.Add(packet);
-            return true;
         }
 
         private string GetEventIdentifier(ulong dataFormatId)
@@ -60,13 +60,13 @@ namespace Stream.Api.Stream.Reader.Handlers
             return eventIdentifier;
         }
 
-        private void OnProcessorProcessEventComplete(object? sender, EventArgs e)
+        private void OnProcessorProcessCompleted(object? sender, EventArgs e)
         {
             var dataQueue = this.eventPacketQueue.ToArray();
             this.eventPacketQueue.Clear();
             foreach (var packet in dataQueue)
             {
-                this.TryHandle(packet);
+                this.Handle(packet);
             }
         }
 
@@ -81,7 +81,7 @@ namespace Stream.Api.Stream.Reader.Handlers
 
                 if (!this.sessionConfig.IsEventExistInConfig(eventIdentifier))
                 {
-                    this.configProcessor.AddEventToConfig(eventIdentifier);
+                    this.configProcessor.AddToConfig(eventIdentifier);
                     this.eventPacketQueue.Enqueue(packet);
                     continue;
                 }
@@ -94,6 +94,7 @@ namespace Stream.Api.Stream.Reader.Handlers
 
                 this.eventPacketQueue.Enqueue(packet);
             }
+
             return Task.CompletedTask;
         }
     }

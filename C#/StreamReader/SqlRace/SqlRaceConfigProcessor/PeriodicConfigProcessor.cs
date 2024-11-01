@@ -11,7 +11,7 @@ using MESL.SqlRace.Enumerators;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    internal class PeriodicConfigProcessor : BaseConfigProcessor
+    internal class PeriodicConfigProcessor : BaseConfigProcessor<Tuple<string, uint>>
     {
         private readonly TimeAndSizeWindowBatchProcessor<Tuple<string, uint>> periodicConfigProcessor;
         private readonly ConcurrentBag<string> parametersProcessed;
@@ -33,9 +33,9 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             this.parametersProcessed = [];
         }
 
-        public event EventHandler? ProcessPeriodicComplete;
+        public override event EventHandler? ProcessCompleted;
 
-        public void AddPeriodicParameterToConfig(Tuple<string, uint> parameter)
+        public override void AddToConfig(Tuple<string, uint> parameter)
         {
             if (this.parametersProcessed.Contains(parameter.Item1 + parameter.Item2))
             {
@@ -150,7 +150,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             stopwatch.Stop();
             Console.WriteLine(
                 $"Successfully added configuration {config.Identifier} for {parameterIdentifiers.Count} periodic parameters. Time Taken: {stopwatch.ElapsedMilliseconds} ms.");
-            this.ProcessPeriodicComplete?.Invoke(this, EventArgs.Empty);
+            this.ProcessCompleted?.Invoke(this, EventArgs.Empty);
 
             return Task.CompletedTask;
         }

@@ -11,7 +11,7 @@ using MESL.SqlRace.Enumerators;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    internal class SynchroConfigProcessor : BaseConfigProcessor
+    internal class SynchroConfigProcessor : BaseConfigProcessor<IReadOnlyList<string>>
     {
         private readonly TimeAndSizeWindowBatchProcessor<string> synchroConfigProcessor;
         private readonly ConcurrentBag<string> parametersAlreadyProcessed;
@@ -28,9 +28,9 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             this.synchroConfigProcessor = new TimeAndSizeWindowBatchProcessor<string>(this.ConfigProcessor, new CancellationTokenSource(), 1000, 100);
         }
 
-        public event EventHandler? ProcessSynchroComplete;
+        public override event EventHandler? ProcessCompleted;
 
-        public void AddSynchroParameterToConfig(IReadOnlyList<string> parameterList)
+        public override void AddToConfig(IReadOnlyList<string> parameterList)
         {
             var newParameters = parameterList.Where(x => !this.parametersAlreadyProcessed.Contains(x)).ToList();
             if (!newParameters.Any())
@@ -133,7 +133,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             stopwatch.Stop();
             Console.WriteLine(
                 $"Successfully added configuration {config.Identifier} for {parameterList.Count} synchro parameters. Time Taken: {stopwatch.ElapsedMilliseconds} ms.");
-            this.ProcessSynchroComplete?.Invoke(this, EventArgs.Empty);
+            this.ProcessCompleted?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }
     }

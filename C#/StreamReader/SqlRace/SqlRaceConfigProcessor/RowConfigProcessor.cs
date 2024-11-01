@@ -11,7 +11,7 @@ using MESL.SqlRace.Enumerators;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    internal class RowConfigProcessor : BaseConfigProcessor
+    internal class RowConfigProcessor : BaseConfigProcessor<IReadOnlyList<string>>
     {
         private readonly TimeAndSizeWindowBatchProcessor<List<string>> rowConfigProcessor;
         private readonly ConcurrentBag<string> parametersProcessed;
@@ -38,9 +38,9 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             this.parametersProcessed = [];
         }
 
-        public event EventHandler? ProcessRowComplete;
+        public override event EventHandler? ProcessCompleted;
 
-        public void AddParameterToConfig(IReadOnlyList<string> parameterList)
+        public override void AddToConfig(IReadOnlyList<string> parameterList)
         {
             var newParameters = parameterList.Where(x => !this.parametersProcessed.Contains(x)).ToList();
             if (!newParameters.Any())
@@ -152,7 +152,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             stopwatch.Stop();
             Console.WriteLine(
                 $"Successfully added configuration {config.Identifier} for {parameterIdentifiers.Count} row parameters. Time taken: {stopwatch.ElapsedMilliseconds} ms.");
-            this.ProcessRowComplete?.Invoke(this, EventArgs.Empty);
+            this.ProcessCompleted?.Invoke(this, EventArgs.Empty);
 
             return Task.CompletedTask;
         }

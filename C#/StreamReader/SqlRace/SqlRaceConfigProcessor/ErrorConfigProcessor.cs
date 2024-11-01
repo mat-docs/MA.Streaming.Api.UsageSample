@@ -14,7 +14,7 @@ using DataType = MESL.SqlRace.Enumerators.DataType;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    internal class ErrorConfigProcessor : BaseConfigProcessor
+    internal class ErrorConfigProcessor : BaseConfigProcessor<ErrorPacket>
     {
         private readonly TimeAndSizeWindowBatchProcessor<ErrorPacket> errorConfigProcessor;
         private readonly ConcurrentBag<string> errorsProcessed;
@@ -41,9 +41,9 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             this.errorsProcessed = [];
         }
 
-        public event EventHandler? ProcessErrorComplete;
+        public override event EventHandler? ProcessCompleted;
 
-        public void AddErrorToConfig(ErrorPacket packet)
+        public override void AddToConfig(ErrorPacket packet)
         {
             if (this.errorsProcessed.Contains(packet.Name))
             {
@@ -163,7 +163,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             stopwatch.Stop();
             Console.WriteLine(
                 $"Successfully added configuration {config.Identifier} for {errorPackets.Count} errors. Time taken: {stopwatch.ElapsedMilliseconds} ms.");
-            this.ProcessErrorComplete?.Invoke(this, EventArgs.Empty);
+            this.ProcessCompleted?.Invoke(this, EventArgs.Empty);
 
             return Task.CompletedTask;
         }

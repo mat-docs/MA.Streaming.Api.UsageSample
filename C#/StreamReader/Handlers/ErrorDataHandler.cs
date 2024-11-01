@@ -3,44 +3,43 @@
 
 using System.Collections.Concurrent;
 
+using MA.DataPlatforms.DataRecorder.SqlRaceWriter.Abstractions;
 using MA.Streaming.Core;
 using MA.Streaming.OpenData;
 
 using Stream.Api.Stream.Reader.Abstractions;
 using Stream.Api.Stream.Reader.SqlRace;
 using Stream.Api.Stream.Reader.SqlRace.Mappers;
-using Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class ErrorDataHandler : BaseHandler
+    internal class ErrorDataHandler : BaseHandler<ErrorPacket>
     {
         private readonly ISqlRaceWriter sessionWriter;
         private readonly SessionConfig sessionConfig;
         private readonly ConcurrentQueue<ErrorPacket> errorPacketQueue;
-        private readonly ErrorConfigProcessor configProcessor;
+        private readonly IConfigProcessor<ErrorPacket> configProcessor;
         private readonly ErrorPacketToSqlRaceErrorMapper errorMapper;
         private readonly TimeAndSizeWindowBatchProcessor<ErrorPacket> errorProcessor;
 
         public ErrorDataHandler(
             ISqlRaceWriter sessionWriter,
             SessionConfig sessionConfig,
-            ErrorConfigProcessor configProcessor,
+            IConfigProcessor<ErrorPacket> configProcessor,
             ErrorPacketToSqlRaceErrorMapper errorMapper)
         {
             this.sessionWriter = sessionWriter;
             this.sessionConfig = sessionConfig;
             this.errorPacketQueue = [];
             this.configProcessor = configProcessor;
-            this.configProcessor.ProcessErrorComplete += this.OnProcessorProcessErrorComplete;
+            this.configProcessor.ProcessCompleted += this.OnProcessorProcessErrorComplete;
             this.errorMapper = errorMapper;
             this.errorProcessor = new TimeAndSizeWindowBatchProcessor<ErrorPacket>(this.ProcessPackets, new CancellationTokenSource(), 1000, 1);
         }
 
-        public bool TryHandle(ErrorPacket packet)
+        public override void Handle(ErrorPacket packet)
         {
             this.errorProcessor.Add(packet);
-            return true;
         }
 
         public void OnProcessorProcessErrorComplete(object? sender, EventArgs e)
@@ -49,7 +48,7 @@ namespace Stream.Api.Stream.Reader.Handlers
             this.errorPacketQueue.Clear();
             foreach (var packet in errorCopy)
             {
-                this.TryHandle(packet);
+                this.Handle(packet);
             }
         }
 
@@ -60,7 +59,7 @@ namespace Stream.Api.Stream.Reader.Handlers
                 this.Update();
                 if (!this.sessionConfig.IsErrorExistInConfig(packet.Name))
                 {
-                    this.configProcessor.AddErrorToConfig(packet);
+                    this.configProcessor.AddToConfig(packet);
                     this.errorPacketQueue.Enqueue(packet);
                     continue;
                 }

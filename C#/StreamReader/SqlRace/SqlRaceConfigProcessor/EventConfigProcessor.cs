@@ -15,7 +15,7 @@ using EventDefinition = MESL.SqlRace.Domain.EventDefinition;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    internal class EventConfigProcessor : BaseConfigProcessor
+    internal class EventConfigProcessor : BaseConfigProcessor<string>
     {
         private readonly Dictionary<EventPriority, EventPriorityType> eventPriorityDictionary =
             new()
@@ -64,9 +64,9 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             this.eventsProcessed = [];
         }
 
-        public event EventHandler? ProcessEventComplete;
+        public override event EventHandler? ProcessCompleted;
 
-        public void AddEventToConfig(string eventIdentifier)
+        public override void AddToConfig(string eventIdentifier)
         {
             if (this.eventsProcessed.Contains(eventIdentifier))
             {
@@ -147,7 +147,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             stopwatch.Stop();
             Console.WriteLine(
                 $"Successfully added configuration {config.Identifier} for {eventIdentifiers.Count} events. Time Taken: {stopwatch.ElapsedMilliseconds}.");
-            this.ProcessEventComplete?.Invoke(this, EventArgs.Empty);
+            this.ProcessCompleted?.Invoke(this, EventArgs.Empty);
 
             return Task.CompletedTask;
         }
