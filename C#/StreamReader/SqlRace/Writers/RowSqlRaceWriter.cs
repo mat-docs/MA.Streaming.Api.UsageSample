@@ -8,27 +8,34 @@ using Stream.Api.Stream.Reader.Dto;
 
 namespace Stream.Api.Stream.Reader.SqlRace.Writers
 {
-    internal class RowSqlRaceWriter : BaseSqlRaceWriter
+    internal class RowSqlRaceWriter : ConfigSensitiveSqlRaceWriter
     {
-        public RowSqlRaceWriter(IClientSession clientSession)
-            : base(clientSession)
+        public RowSqlRaceWriter(IClientSession clientSession, ReaderWriterLockSlim configLock)
+            : base(clientSession, configLock)
         {
         }
 
         public override bool TryWrite(ISqlRaceDto data)
         {
             var rowDto = (SqlRaceRowDto)data;
+            bool success;
             try
             {
+                this.ConfigLock.EnterReadLock();
                 this.ClientSession.Session.AddRowData(rowDto.Timestamp, new List<uint>(rowDto.Channels), rowDto.Data);
+                success = true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Unable to write row data due to {ex.Message}");
-                return false;
+                success = false;
+            }
+            finally
+            {
+                this.ConfigLock.ExitReadLock();
             }
 
-            return true;
+            return success;
         }
     }
 }

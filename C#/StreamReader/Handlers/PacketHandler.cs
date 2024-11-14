@@ -7,30 +7,52 @@ using Stream.Api.Stream.Reader.Abstractions;
 
 namespace Stream.Api.Stream.Reader.Handlers
 {
-    internal class PacketHandler : IPacketHandler
+    internal class PacketHandler : BaseHandler<Packet>
     {
-        private readonly PeriodicDataHandler periodicDataHandler;
-        private readonly RowDataHandler rowDataHandler;
-        private readonly MarkerHandler markerHandler;
-        private readonly EventDataHandler eventDataHandler;
+        private readonly IPacketHandler<PeriodicDataPacket> periodicDataHandler;
+        private readonly IPacketHandler<RowDataPacket> rowDataHandler;
+        private readonly IPacketHandler<MarkerPacket> markerHandler;
+        private readonly IPacketHandler<EventPacket> eventDataHandler;
+        private readonly IPacketHandler<ErrorPacket> errorDataHandler;
+        private readonly IPacketHandler<RawCANDataPacket> rawCanDataHandler;
+        private readonly IPacketHandler<SynchroDataPacket> synchroDataHandler;
 
         public PacketHandler(
-            PeriodicDataHandler periodicDataHandler,
-            RowDataHandler rowDataHandler,
-            MarkerHandler markerHandler,
-            EventDataHandler eventDataHandler
+            IPacketHandler<PeriodicDataPacket> periodicDataHandler,
+            IPacketHandler<RowDataPacket> rowDataHandler,
+            IPacketHandler<MarkerPacket> markerHandler,
+            IPacketHandler<EventPacket> eventDataHandler,
+            IPacketHandler<ErrorPacket> errorDataHandler,
+            IPacketHandler<RawCANDataPacket> rawCanDataHandler,
+            IPacketHandler<SynchroDataPacket> synchroDataHandler
         )
         {
             this.eventDataHandler = eventDataHandler;
             this.markerHandler = markerHandler;
             this.periodicDataHandler = periodicDataHandler;
             this.rowDataHandler = rowDataHandler;
+            this.errorDataHandler = errorDataHandler;
+            this.rawCanDataHandler = rawCanDataHandler;
+            this.synchroDataHandler = synchroDataHandler;
         }
 
-        public void Handle(Packet packet)
+        public override void Stop()
+        {
+            this.synchroDataHandler.Stop();
+            this.rawCanDataHandler.Stop();
+            this.errorDataHandler.Stop();
+            this.eventDataHandler.Stop();
+            this.markerHandler.Stop();
+            this.rowDataHandler.Stop();
+            this.periodicDataHandler.Stop();
+            base.Stop();
+        }
+
+        public override void Handle(Packet packet)
         {
             var packetType = packet.Type;
             var content = packet.Content;
+            this.Update();
             try
             {
                 switch (packetType)
@@ -38,25 +60,43 @@ namespace Stream.Api.Stream.Reader.Handlers
                     case "PeriodicData":
                     {
                         var periodicDataPacket = PeriodicDataPacket.Parser.ParseFrom(content);
-                        this.periodicDataHandler.TryHandle(periodicDataPacket);
+                        this.periodicDataHandler.Handle(periodicDataPacket);
                         break;
                     }
                     case "RowData":
                     {
                         var rowDataPacket = RowDataPacket.Parser.ParseFrom(content);
-                        this.rowDataHandler.TryHandle(rowDataPacket);
+                        this.rowDataHandler.Handle(rowDataPacket);
                         break;
                     }
                     case "Marker":
                     {
                         var markerPacket = MarkerPacket.Parser.ParseFrom(content);
-                        this.markerHandler.TryHandle(markerPacket);
+                        this.markerHandler.Handle(markerPacket);
                         break;
                     }
                     case "Event":
                     {
                         var eventPacket = EventPacket.Parser.ParseFrom(content);
-                        this.eventDataHandler.TryHandle(eventPacket);
+                        this.eventDataHandler.Handle(eventPacket);
+                        break;
+                    }
+                    case "Error":
+                    {
+                        var errorPacket = ErrorPacket.Parser.ParseFrom(content);
+                        this.errorDataHandler.Handle(errorPacket);
+                        break;
+                    }
+                    case "RawCANData":
+                    {
+                        var rawCanPacket = RawCANDataPacket.Parser.ParseFrom(content);
+                        this.rawCanDataHandler.Handle(rawCanPacket);
+                        break;
+                    }
+                    case "SynchroData":
+                    {
+                        var synchroDataPacket = SynchroDataPacket.Parser.ParseFrom(content);
+                        this.synchroDataHandler.Handle(synchroDataPacket);
                         break;
                     }
                     default:

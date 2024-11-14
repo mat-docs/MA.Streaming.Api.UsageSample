@@ -5,8 +5,10 @@ using MA.Streaming.OpenData;
 
 namespace Stream.Api.Stream.Reader.Abstractions
 {
-    public interface IPacketHandler
+    public interface IPacketHandler<in T>
     {
-        public void Handle(Packet packet);
+        public void Handle(T packet);
+
+        public void Stop();
     }
 }

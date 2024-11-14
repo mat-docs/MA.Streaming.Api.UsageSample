@@ -11,10 +11,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Docker.DotNet" Version="3.125.15" />
-		<PackageReference Include="MA.Streaming.Core" Version="1.*" />
-		<PackageReference Include="MA.Streaming.Proto.Client.Local" Version="1.*" />
-		<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.*" />
+		<PackageReference Include="MA.Streaming.Core" Version="1.3.3.26" />
+		<PackageReference Include="MA.Streaming.Proto.Client.Local" Version="1.3.3.26" />
+		<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.3.3.26" />
 	</ItemGroup>
 
 	

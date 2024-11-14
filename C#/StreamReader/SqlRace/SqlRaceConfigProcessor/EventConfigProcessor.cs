@@ -15,7 +15,7 @@ using EventDefinition = MESL.SqlRace.Domain.EventDefinition;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    internal class EventConfigProcessor : BaseConfigProcessor
+    internal class EventConfigProcessor : BaseConfigProcessor<string>
     {
         private readonly Dictionary<EventPriority, EventPriorityType> eventPriorityDictionary =
             new()
@@ -46,7 +46,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             ConfigurationSetManager configurationSetManager,
             RationalConversion defaultConversion,
             IClientSession clientSession,
-            object configLock,
+            ReaderWriterLockSlim configLock,
             SessionConfig sessionConfig)
             : base(
                 configurationSetManager,
@@ -64,9 +64,9 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             this.eventsProcessed = [];
         }
 
-        public event EventHandler? ProcessEventComplete;
+        public override event EventHandler? ProcessCompleted;
 
-        public void AddEventToConfig(string eventIdentifier)
+        public override void AddToConfig(string eventIdentifier)
         {
             if (this.eventsProcessed.Contains(eventIdentifier))
             {
@@ -118,31 +118,36 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             Console.WriteLine($"Commiting config {config.Identifier}.");
             try
             {
-                lock (this.ConfigLock)
-                {
-                    config.Commit();
-                }
+                this.ConfigLock.EnterWriteLock();
+                config.Commit();
 
-                this.ClientSession.Session.UseLoggingConfigurationSet(config.Identifier);
-
-                foreach (var events in eventsToAdd)
-                {
-                    this.SessionConfig.SetEventDefinition(events.Key, events.Value);
-                }
-
-                stopwatch.Stop();
-                Console.WriteLine(
-                    $"Successfully added configuration {config.Identifier} for {eventIdentifiers.Count} events. Time Taken: {stopwatch.ElapsedMilliseconds}.");
-                this.ProcessEventComplete?.Invoke(this, EventArgs.Empty);
             }
             catch (ConfigurationSetAlreadyExistsException)
             {
                 Console.WriteLine($"Config {config.Identifier} already exists.");
+                return Task.CompletedTask;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Unable to add config due to {ex.Message}");
+                return Task.CompletedTask;
             }
+            finally
+            {
+                this.ConfigLock.ExitWriteLock();
+            }
+
+            this.ClientSession.Session.UseLoggingConfigurationSet(config.Identifier);
+
+            foreach (var events in eventsToAdd)
+            {
+                this.SessionConfig.SetEventDefinition(events.Key, events.Value);
+            }
+
+            stopwatch.Stop();
+            Console.WriteLine(
+                $"Successfully added configuration {config.Identifier} for {eventIdentifiers.Count} events. Time Taken: {stopwatch.ElapsedMilliseconds}.");
+            this.ProcessCompleted?.Invoke(this, EventArgs.Empty);
 
             return Task.CompletedTask;
         }

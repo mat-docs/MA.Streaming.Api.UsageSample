@@ -2,7 +2,9 @@
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
 using MA.Streaming.API;
+using MA.Streaming.OpenData;
 
+using MESL.SqlRace.Common.Extensions;
 using MESL.SqlRace.Domain;
 
 using Stream.Api.Stream.Reader.Abstractions;
@@ -18,9 +20,9 @@ namespace Stream.Api.Stream.Reader.SqlRace
         private readonly List<IStreamApiReader> streamApiReaders;
         private readonly string sessionKey;
         private readonly Dictionary<string, long> streamsOffsetDictionary;
-        private readonly ISqlRaceWriter sqlRaceWriter;
+        private readonly ISqlRaceSessionWriter sqlRaceWriter;
         private readonly IClientSession clientSession;
-        private readonly IPacketHandler packetHandler;
+        private readonly IPacketHandler<Packet> packetHandler;
         private const byte TriggerSourceStart = 0;
         private const string DefaultLapName = "Out Lap";
 
@@ -28,8 +30,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
             StreamApiClient streamApiClient,
             IClientSession clientSession,
             string sessionKey,
-            ISqlRaceWriter sqlRaceWriter,
-            IPacketHandler packetHandler)
+            ISqlRaceSessionWriter sqlRaceWriter,
+            IPacketHandler<Packet> packetHandler)
         {
             this.streamApiClient = streamApiClient;
             this.streamApiReaders = [];
@@ -54,6 +56,12 @@ namespace Stream.Api.Stream.Reader.SqlRace
                 this.clientSession.Session.LapCollection.Add(lap);
             }
 
+            this.packetHandler.Stop();
+            Console.WriteLine($"Setting start and end time to {this.sqlRaceWriter.StartTimestamp.ToDateTime().TimeOfDay} and {this.sqlRaceWriter.EndTimestamp.ToDateTime().TimeOfDay}");
+            this.clientSession.Session.SetStartTime(this.sqlRaceWriter.StartTimestamp);
+            this.clientSession.Session.SetEndTime(this.sqlRaceWriter.EndTimestamp);
+            this.clientSession.Session.SetSessionTimerange(this.sqlRaceWriter.StartTimestamp, this.sqlRaceWriter.EndTimestamp);
+            this.clientSession.Session.Flush();
             this.clientSession.Session.EndData();
             this.clientSession.Close();
             this.SessionEnded = true;
@@ -88,7 +96,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                                  newStream => new Tuple<string, long>(
                                      newStream,
                                      sessionInfo.TopicPartitionOffsets.GetValueOrDefault(
-                                         $"{sessionInfo.DataSource}.{newStream}:[0]",
+                                         $"{sessionInfo.DataSource}.{newStream}:0",
                                          0))))
                     {
                         streamList.Add(newStreamAndOffset);

@@ -1,4 +1,4 @@
-﻿// <copyright file="RowConfigProcessor.cs" company="McLaren Applied Ltd.">
+﻿// <copyright file="SynchroConfigProcessor.cs" company="McLaren Applied Ltd.">
 // Copyright (c) McLaren Applied Ltd.</copyright>
 
 using System.Collections.Concurrent;
@@ -11,94 +11,81 @@ using MESL.SqlRace.Enumerators;
 
 namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 {
-    internal class RowConfigProcessor : BaseConfigProcessor<IReadOnlyList<string>>
+    internal class SynchroConfigProcessor : BaseConfigProcessor<IReadOnlyList<string>>
     {
-        private readonly TimeAndSizeWindowBatchProcessor<List<string>> rowConfigProcessor;
-        private readonly ConcurrentBag<string> parametersProcessed;
+        private readonly TimeAndSizeWindowBatchProcessor<string> synchroConfigProcessor;
+        private readonly ConcurrentBag<string> parametersAlreadyProcessed;
 
-        public RowConfigProcessor(
+        public SynchroConfigProcessor(
             ConfigurationSetManager configurationSetManager,
             RationalConversion defaultConversion,
             IClientSession clientSession,
             ReaderWriterLockSlim configLock,
             SessionConfig sessionConfig)
-            : base(
-                configurationSetManager,
-                defaultConversion,
-                clientSession,
-                configLock,
-                sessionConfig)
+            : base(configurationSetManager, defaultConversion, clientSession, configLock, sessionConfig)
         {
-            this.rowConfigProcessor =
-                new TimeAndSizeWindowBatchProcessor<List<string>>(
-                    this.ProcessRowConfig,
-                    new CancellationTokenSource(),
-                    100000,
-                    10000);
-            this.parametersProcessed = [];
+            this.parametersAlreadyProcessed = [];
+            this.synchroConfigProcessor = new TimeAndSizeWindowBatchProcessor<string>(this.ConfigProcessor, new CancellationTokenSource(), 1000, 100);
         }
 
         public override event EventHandler? ProcessCompleted;
 
         public override void AddToConfig(IReadOnlyList<string> parameterList)
         {
-            var newParameters = parameterList.Where(x => !this.parametersProcessed.Contains(x)).ToList();
+            var newParameters = parameterList.Where(x => !this.parametersAlreadyProcessed.Contains(x)).ToList();
             if (!newParameters.Any())
             {
                 return;
             }
 
-            foreach (var parameter in newParameters)
-            {
-                this.parametersProcessed.Add(parameter);
-            }
-
-            this.rowConfigProcessor.Add(newParameters);
+            newParameters.ForEach(
+                x =>
+                {
+                    this.synchroConfigProcessor.Add(x);
+                    this.parametersAlreadyProcessed.Add(x);
+                });
         }
 
-        private Task ProcessRowConfig(IReadOnlyList<IReadOnlyList<string>> parameterIdentifiers)
+        private Task ConfigProcessor(IReadOnlyList<string> parameterList)
         {
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-            Console.WriteLine($"Adding config for {parameterIdentifiers.Count} row parameters.");
-            var parameterIdentifiersToProcess = parameterIdentifiers.SelectMany(x => x).ToList();
+
+            Console.WriteLine($"Adding config for {parameterList.Count} synchro parameters.");
+
             var configSetIdentifier = Guid.NewGuid().ToString();
             var config = this.ConfigurationSetManager.Create(this.ClientSession.Session.ConnectionString, configSetIdentifier, "");
-
             config.AddConversion(this.DefaultConversion);
 
             var channelsToAdd = new Dictionary<string, uint>();
-            foreach (var parameterIdentifier in parameterIdentifiersToProcess)
+            foreach (var parameter in parameterList)
             {
-                var parameterGroup = new ParameterGroup(parameterIdentifier.Split(':')[1]);
+                var parameterName = parameter.Split(':')[0];
+                var appName = parameter.Split(":")[1];
+                var parameterGroup = new ParameterGroup(appName);
                 config.AddParameterGroup(parameterGroup);
-
                 var applicationGroup =
                     new ApplicationGroup(
-                        parameterIdentifier.Split(':')[1],
-                        parameterIdentifier.Split(':')[1],
-                        new List<string>
-                        {
-                            parameterGroup.Identifier
-                        })
+                        appName,
+                        appName,
+                        [parameterGroup.Identifier])
                     {
                         SupportsRda = false
                     };
                 config.AddGroup(applicationGroup);
-
                 var channelId = this.GenerateUniqueChannelId();
-                channelsToAdd[parameterIdentifier] = channelId;
+                channelsToAdd[parameter] = channelId;
                 var parameterChannel = new Channel(
                     channelId,
-                    parameterIdentifier,
+                    parameter,
                     0,
                     DataType.Double64Bit,
-                    ChannelDataSourceType.RowData,
-                    parameterIdentifier);
+                    ChannelDataSourceType.Synchro,
+                    parameter);
                 config.AddChannel(parameterChannel);
-                var parameter = new Parameter(
-                    parameterIdentifier,
-                    parameterIdentifier.Split(':')[0],
+                var parameterObj = new Parameter(
+                    parameter,
+                    parameterName,
                     "",
                     0,
                     100,
@@ -108,17 +95,11 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
                     0xFFFF,
                     0,
                     "DefaultConversion",
-                    new List<string>
-                    {
-                        applicationGroup.Name
-                    },
-                    new List<uint>
-                    {
-                        channelId
-                    },
+                    [applicationGroup.Name],
+                    [channelId],
                     applicationGroup.Name
                 );
-                config.AddParameter(parameter);
+                config.AddParameter(parameterObj);
             }
 
             Console.WriteLine($"Commiting config {config.Identifier}.");
@@ -134,7 +115,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unable to write config {config.Identifier} due to {ex.Message}");
+                Console.WriteLine($"Unable to add Config {config.Identifier} due to {ex.Message}");
                 return Task.CompletedTask;
             }
             finally
@@ -146,14 +127,13 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
 
             foreach (var parameter in channelsToAdd)
             {
-                this.SessionConfig.SetParameterChannelId(parameter.Key, parameter.Value);
+                this.SessionConfig.SetSynchroChannelId(parameter.Key, parameter.Value);
             }
 
             stopwatch.Stop();
             Console.WriteLine(
-                $"Successfully added configuration {config.Identifier} for {parameterIdentifiers.Count} row parameters. Time taken: {stopwatch.ElapsedMilliseconds} ms.");
+                $"Successfully added configuration {config.Identifier} for {parameterList.Count} synchro parameters. Time Taken: {stopwatch.ElapsedMilliseconds} ms.");
             this.ProcessCompleted?.Invoke(this, EventArgs.Empty);
-
             return Task.CompletedTask;
         }
     }

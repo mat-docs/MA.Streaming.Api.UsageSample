@@ -13,6 +13,8 @@ namespace Stream.Api.Stream.Reader.Dto
             this.DataType = "Session Info";
         }
 
+        public long Timestamp { get; }
+
         public string DataType { get; }
 
         public string SessionIdentifier { get; }
