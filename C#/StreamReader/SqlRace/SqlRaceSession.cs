@@ -108,7 +108,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                         DataSource = sessionInfo.DataSource,
                         EssentialsOffset = sessionInfo.EssentialsOffset,
                         MainOffset = sessionInfo.MainOffset,
-                        Session = this.sessionKey,
+                        SessionKey = this.sessionKey,
                         StreamOffsets =
                         {
                             streamList.Select(x => x.Item2).ToList()

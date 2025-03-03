@@ -92,7 +92,7 @@ internal class ReadAndWriteManagementPresenter
                     DataSource = dataSource,
                     EssentialsOffset = 0,
                     MainOffset = 0,
-                    Session = sessionKey,
+                    SessionKey = sessionKey,
                     StreamOffsets =
                     {
                         0
