@@ -16,6 +16,7 @@ namespace Stream.Api.Stream.Reader.Handlers
         private readonly IPacketHandler<ErrorPacket> errorDataHandler;
         private readonly IPacketHandler<RawCANDataPacket> rawCanDataHandler;
         private readonly IPacketHandler<SynchroDataPacket> synchroDataHandler;
+        private readonly IPacketHandler<CoverageCursorInfoPacket> coverageCursorInfoHandler;
 
         public PacketHandler(
             IPacketHandler<PeriodicDataPacket> periodicDataHandler,
@@ -24,8 +25,8 @@ namespace Stream.Api.Stream.Reader.Handlers
             IPacketHandler<EventPacket> eventDataHandler,
             IPacketHandler<ErrorPacket> errorDataHandler,
             IPacketHandler<RawCANDataPacket> rawCanDataHandler,
-            IPacketHandler<SynchroDataPacket> synchroDataHandler
-        )
+            IPacketHandler<SynchroDataPacket> synchroDataHandler,
+            IPacketHandler<CoverageCursorInfoPacket> coverageCursorInfoHandler)
         {
             this.eventDataHandler = eventDataHandler;
             this.markerHandler = markerHandler;
@@ -34,6 +35,7 @@ namespace Stream.Api.Stream.Reader.Handlers
             this.errorDataHandler = errorDataHandler;
             this.rawCanDataHandler = rawCanDataHandler;
             this.synchroDataHandler = synchroDataHandler;
+            this.coverageCursorInfoHandler = coverageCursorInfoHandler;
         }
 
         public override void Stop()
@@ -97,6 +99,12 @@ namespace Stream.Api.Stream.Reader.Handlers
                     {
                         var synchroDataPacket = SynchroDataPacket.Parser.ParseFrom(content);
                         this.synchroDataHandler.Handle(synchroDataPacket);
+                        break;
+                    }
+                    case "CoverageCursorInfo":
+                    {
+                        var coverageCursorInfo = CoverageCursorInfoPacket.Parser.ParseFrom(content);
+                        this.coverageCursorInfoHandler.Handle(coverageCursorInfo);
                         break;
                     }
                     default:
