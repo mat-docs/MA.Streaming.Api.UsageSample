@@ -99,7 +99,7 @@ class SinWaveGenerator:
             description="",
             units="m",
             data_type=open_data_pb2.DATA_TYPE_FLOAT64,
-            format_string="6.3f",
+            format_string="%6.3f",
             frequencies=[self.frequency],
             max_value=1,
             min_value=-1,
