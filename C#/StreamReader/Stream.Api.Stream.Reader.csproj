@@ -2,15 +2,15 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
       <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.3.4.166-ci" />
-    <PackageReference Include="MESL.SQLRace.API" Version="2.1.24214.8" />
+    <PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.3.6.33" />
+    <PackageReference Include="MESL.SQLRace.API" Version="2.1.25213.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
