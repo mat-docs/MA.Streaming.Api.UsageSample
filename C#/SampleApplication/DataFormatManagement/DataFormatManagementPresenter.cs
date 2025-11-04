@@ -1,5 +1,5 @@
-// <copyright file="DataFormatManagementPresenter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+// <copyright file="DataFormatManagementPresenter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Grpc.Core;
 
@@ -219,16 +219,15 @@ internal class DataFormatManagementPresenter
             if (lstPacketDefinitions.Any())
             {
                 this.listener.OnAllDataFormatLoaded(
-                    lstPacketDefinitions.Select(
-                        i =>
-                        {
-                            var parameterIdentifiers = i.HasEventIdentifier ? [i.EventIdentifier] : i.ParameterIdentifiers.ParameterIdentifiers;
-                            return new DataFormatDefinitionPacketDto(
-                                i.Identifier,
-                                (DataFormatTypeDto)i.Type,
-                                parameterIdentifiers,
-                                string.Join(",", parameterIdentifiers));
-                        }));
+                    lstPacketDefinitions.Select(i =>
+                    {
+                        var parameterIdentifiers = i.HasEventIdentifier ? [i.EventIdentifier] : i.ParameterIdentifiers.ParameterIdentifiers;
+                        return new DataFormatDefinitionPacketDto(
+                            i.Identifier,
+                            (DataFormatTypeDto)i.Type,
+                            parameterIdentifiers,
+                            string.Join(",", parameterIdentifiers));
+                    }));
             }
 
             this.connectionManagerServiceClient.CloseConnection(

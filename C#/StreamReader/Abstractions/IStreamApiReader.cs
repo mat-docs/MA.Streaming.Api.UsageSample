@@ -1,5 +1,5 @@
-﻿// <copyright file="IStreamApiReader.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="IStreamApiReader.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 namespace Stream.Api.Stream.Reader.Abstractions
 {

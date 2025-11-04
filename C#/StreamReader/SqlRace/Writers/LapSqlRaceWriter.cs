@@ -1,5 +1,5 @@
-﻿// <copyright file="LapSqlRaceWriter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="LapSqlRaceWriter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MESL.SqlRace.Common.Extensions;
 using MESL.SqlRace.Domain;
@@ -71,7 +71,8 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
                 return true;
             }
 
-            if (newLap.StartTime < this.ClientSession.Session.StartTime && this.previousLap is not null)
+            if (newLap.StartTime < this.ClientSession.Session.StartTime &&
+                this.previousLap is not null)
             {
                 Console.WriteLine($"Rejecting lap marker {lapDto.Name} at {lapDto.Timestamp} since its earlier than the start time.");
                 return true;
@@ -93,6 +94,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
                     {
                         this.previousLap.CountForFastestLap = true;
                     }
+
                     this.ClientSession.Session.LapCollection.Update(this.previousLap);
                     this.previousLap = newLap;
                 }

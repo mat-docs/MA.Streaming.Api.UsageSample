@@ -1,5 +1,5 @@
-﻿// <copyright file="StreamApiClient.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="StreamApiClient.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Google.Protobuf.Collections;
 

@@ -1,5 +1,5 @@
-﻿// <copyright file="ReadAndWriteManagementPresenter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="ReadAndWriteManagementPresenter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Google.Protobuf;
 
@@ -58,23 +58,86 @@ internal class ReadAndWriteManagementPresenter
         this.StartRunInfo(runInfo);
         Task.Delay(50).Wait();
         this.listener.OnRunStarted(runInfo);
-        _ = Task.Run(
-            async () =>
+        _ = Task.Run(async () =>
+        {
+            for (var i = 0; i < numberOfMessageToPublish; i++)
             {
-                for (var i = 0; i < numberOfMessageToPublish; i++)
+                var sampleCustomObject = new SampleCustomObject(runInfo.RunId, (uint)i, messageSize);
+                var writeDataPacketsRequest = new WriteDataPacketsRequest
                 {
-                    var sampleCustomObject = new SampleCustomObject(runInfo.RunId, (uint)i, messageSize);
-                    var writeDataPacketsRequest = new WriteDataPacketsRequest
+                    Details =
                     {
-                        Details =
+                        CreateDataPacketDetail(runInfo.RunId, dataSource, stream, sessionKey, sampleCustomObject)
+                    }
+                };
+                await runInfo.Publish(writeDataPacketsRequest);
+                this.listener.OnMessagesPublished(runInfo, 1, (DateTime.Now - sampleCustomObject.CreationTime).TotalMilliseconds);
+            }
+        });
+    }
+
+    public void PublishUsingBatching(string dataSource, string stream, string sessionKey, uint numberOfMessageToPublish, uint messageSize)
+    {
+        this.InitialiseReaderStream(dataSource, stream, sessionKey);
+        var runInfo = this.CreateRunInfoAndInsertInToRunInfos(dataSource, stream, sessionKey, numberOfMessageToPublish, messageSize);
+        this.StartRunInfo(runInfo);
+        Task.Delay(50).Wait();
+        this.listener.OnRunStarted(runInfo);
+        _ = Task.Run(() =>
+        {
+            for (var i = 0; i < numberOfMessageToPublish; i++)
+            {
+                var sampleCustomObject = new SampleCustomObject(runInfo.RunId, (uint)i, messageSize);
+                this.timeWindowBatchProcessor.Add(CreateDataPacketDetail(runInfo.RunId, dataSource, stream, sessionKey, sampleCustomObject));
+            }
+        });
+    }
+
+    public void StartListening()
+    {
+        if (this.readerStream is null)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (true)
+                {
+                    while (await this.readerStream.MoveNext())
+                    {
+                        try
                         {
-                            CreateDataPacketDetail(runInfo.RunId, dataSource, stream, sessionKey, sampleCustomObject)
+                            var readPacketsResponse = this.readerStream.Current;
+
+                            if (!long.TryParse(readPacketsResponse.Response[0].Packet.SessionKey, out var runId))
+                            {
+                                continue;
+                            }
+
+                            if (!this.runInfos.TryGetValue(runId, out var runInfo))
+                            {
+                                continue;
+                            }
+
+                            runInfo.OnMessageReceived(readPacketsResponse);
                         }
-                    };
-                    await runInfo.Publish(writeDataPacketsRequest);
-                    this.listener.OnMessagesPublished(runInfo, 1, (DateTime.Now - sampleCustomObject.CreationTime).TotalMilliseconds);
+                        catch (Exception ex)
+                        {
+                            await File.AppendAllTextAsync("log.txt", ex.ToString());
+                        }
+                    }
+
+                    Task.Delay(10).Wait();
                 }
-            });
+            }
+            catch (Exception ex)
+            {
+                await File.AppendAllTextAsync("log.txt", ex.ToString());
+            }
+        });
     }
 
     private void InitialiseReaderStream(string dataSource, string stream, string sessionKey)
@@ -111,24 +174,6 @@ internal class ReadAndWriteManagementPresenter
             }).ResponseStream;
         this.StartListening();
         this.readerStreamInitialised = true;
-    }
-
-    public void PublishUsingBatching(string dataSource, string stream, string sessionKey, uint numberOfMessageToPublish, uint messageSize)
-    {
-        this.InitialiseReaderStream(dataSource, stream, sessionKey);
-        var runInfo = this.CreateRunInfoAndInsertInToRunInfos(dataSource, stream, sessionKey, numberOfMessageToPublish, messageSize);
-        this.StartRunInfo(runInfo);
-        Task.Delay(50).Wait();
-        this.listener.OnRunStarted(runInfo);
-        _ = Task.Run(
-            () =>
-            {
-                for (var i = 0; i < numberOfMessageToPublish; i++)
-                {
-                    var sampleCustomObject = new SampleCustomObject(runInfo.RunId, (uint)i, messageSize);
-                    this.timeWindowBatchProcessor.Add(CreateDataPacketDetail(runInfo.RunId, dataSource, stream, sessionKey, sampleCustomObject));
-                }
-            });
     }
 
     private async Task WriteBatchPackets(IReadOnlyList<DataPacketDetails> dataPacketDetailsList)
@@ -226,53 +271,5 @@ internal class ReadAndWriteManagementPresenter
                 Type = nameof(sampleCustomObject)
             }
         };
-    }
-
-    public void StartListening()
-    {
-        if (this.readerStream is null)
-        {
-            return;
-        }
-
-        _ = Task.Run(
-            async () =>
-            {
-                try
-                {
-                    while (true)
-                    {
-                        while (await this.readerStream.MoveNext())
-                        {
-                            try
-                            {
-                                var readPacketsResponse = this.readerStream.Current;
-
-                                if (!long.TryParse(readPacketsResponse.Response[0].Packet.SessionKey, out var runId))
-                                {
-                                    continue;
-                                }
-
-                                if (!this.runInfos.TryGetValue(runId, out var runInfo))
-                                {
-                                    continue;
-                                }
-
-                                runInfo.OnMessageReceived(readPacketsResponse);
-                            }
-                            catch (Exception ex)
-                            {
-                                await File.AppendAllTextAsync("log.txt", ex.ToString());
-                            }
-                        }
-
-                        Task.Delay(10).Wait();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    await File.AppendAllTextAsync("log.txt", ex.ToString());
-                }
-            });
     }
 }

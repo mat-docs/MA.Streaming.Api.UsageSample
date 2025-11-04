@@ -1,5 +1,5 @@
-﻿// <copyright file="MarkerSqlRaceWriter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="MarkerSqlRaceWriter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MESL.SqlRace.Domain;
 
@@ -9,7 +9,8 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
 {
     internal class MarkerSqlRaceWriter : BaseSqlRaceWriter
     {
-        public MarkerSqlRaceWriter(IClientSession clientSession) : base(clientSession)
+        public MarkerSqlRaceWriter(IClientSession clientSession)
+            : base(clientSession)
         {
         }
 

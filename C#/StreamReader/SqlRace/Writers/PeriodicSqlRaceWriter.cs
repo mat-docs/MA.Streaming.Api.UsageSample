@@ -1,5 +1,5 @@
-﻿// <copyright file="PeriodicSqlRaceWriter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="PeriodicSqlRaceWriter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MESL.SqlRace.Domain;
 
@@ -10,7 +10,8 @@ namespace Stream.Api.Stream.Reader.SqlRace.Writers
 {
     internal class PeriodicSqlRaceWriter : ConfigSensitiveSqlRaceWriter
     {
-        public PeriodicSqlRaceWriter(IClientSession clientSession, ReaderWriterLockSlim configLock) : base(clientSession, configLock)
+        public PeriodicSqlRaceWriter(IClientSession clientSession, ReaderWriterLockSlim configLock)
+            : base(clientSession, configLock)
         {
         }
 

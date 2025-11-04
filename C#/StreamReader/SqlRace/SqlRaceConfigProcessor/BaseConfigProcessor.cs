@@ -1,5 +1,5 @@
-﻿// <copyright file="BaseConfigProcessor.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="BaseConfigProcessor.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MA.DataPlatforms.DataRecorder.SqlRaceWriter.Abstractions;
 
@@ -29,13 +29,13 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             this.SessionConfig = sessionConfig;
         }
 
+        public abstract event EventHandler? ProcessCompleted;
+
+        public abstract void AddToConfig(T item);
+
         protected uint GenerateUniqueChannelId()
         {
             return this.ClientSession.Session.ReserveNextAvailableRowChannelId() % 2147483647;
         }
-
-        public abstract event EventHandler? ProcessCompleted;
-
-        public abstract void AddToConfig(T item);
     }
 }

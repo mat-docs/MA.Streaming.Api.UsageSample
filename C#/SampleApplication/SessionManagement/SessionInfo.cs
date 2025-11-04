@@ -1,32 +1,10 @@
-// <copyright file="SessionInfo.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+// <copyright file="SessionInfo.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 namespace MA.Streaming.Api.UsageSample.SessionManagement;
 
 public class SessionInfo
 {
-    public string DataSource { get; }
-
-    public string SessionKey { get; }
-
-    public string Type { get; }
-
-    public uint Version { get; }
-
-    public IReadOnlyList<string> AssociatedKeys { get; }
-
-    public string Identifier { get; }
-
-    public bool IsComplete { get; }
-
-    public long MainOffset { get; }
-
-    public long EssentialOffset { get; }
-
-    public IReadOnlyList<string> Streams { get; }
-
-    public IDictionary<string, long> TopicPartitionsOffset { get; }
-
     public SessionInfo(
         string dataSource,
         string sessionKey,
@@ -53,4 +31,26 @@ public class SessionInfo
         this.Streams = streams;
         this.TopicPartitionsOffset = topicPartitionsOffset;
     }
+
+    public string DataSource { get; }
+
+    public string SessionKey { get; }
+
+    public string Type { get; }
+
+    public uint Version { get; }
+
+    public IReadOnlyList<string> AssociatedKeys { get; }
+
+    public string Identifier { get; }
+
+    public bool IsComplete { get; }
+
+    public long MainOffset { get; }
+
+    public long EssentialOffset { get; }
+
+    public IReadOnlyList<string> Streams { get; }
+
+    public IDictionary<string, long> TopicPartitionsOffset { get; }
 }

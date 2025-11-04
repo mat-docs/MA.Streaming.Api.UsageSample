@@ -1,5 +1,5 @@
-﻿// <copyright file="DockerComposeFileGenerator.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="DockerComposeFileGenerator.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 namespace MA.Streaming.Api.UsageSample;
 

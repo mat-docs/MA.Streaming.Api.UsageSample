@@ -1,5 +1,5 @@
-﻿// <copyright file="SqlRaceWriter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SqlRaceWriter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Stream.Api.Stream.Reader.Abstractions;
 using Stream.Api.Stream.Reader.Dto;
@@ -51,7 +51,11 @@ namespace Stream.Api.Stream.Reader.SqlRace
         {
             var dataType = data.DataType;
             bool success;
-            if (dataType != "Session Info" && dataType != "Lap" && dataType != "Marker" && dataType != "Event" && dataType != "Error")
+            if (dataType != "Session Info" &&
+                dataType != "Lap" &&
+                dataType != "Marker" &&
+                dataType != "Event" &&
+                dataType != "Error")
             {
                 if (data.Timestamp < this.StartTimestamp)
                 {

@@ -1,5 +1,5 @@
-﻿// <copyright file="SessionStartHandler.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SessionStartHandler.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Grpc.Core;
 

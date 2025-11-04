@@ -1,5 +1,5 @@
-// <copyright file="FrmMain.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+// <copyright file="FrmMain.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using System.Diagnostics;
 using System.Text.Json;
@@ -159,22 +159,20 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
 
     public void OnSessionStartNotification(string dataSource, string sessionKey)
     {
-        this.rtxbNotifications.Invoke(
-            () =>
-            {
-                this.rtxbNotifications.Text +=
-                    $"{DateTime.Now.TimeOfDay}:=> New Session Created{Environment.NewLine}Key:{sessionKey}{Environment.NewLine}DataSource:{dataSource}{Environment.NewLine}-----------------{Environment.NewLine}";
-            });
+        this.rtxbNotifications.Invoke(() =>
+        {
+            this.rtxbNotifications.Text +=
+                $"{DateTime.Now.TimeOfDay}:=> New Session Created{Environment.NewLine}Key:{sessionKey}{Environment.NewLine}DataSource:{dataSource}{Environment.NewLine}-----------------{Environment.NewLine}";
+        });
     }
 
     public void OnSessionStopNotification(string dataSource, string sessionKey)
     {
-        this.rtxbNotifications.Invoke(
-            () =>
-            {
-                this.rtxbNotifications.Text +=
-                    $"{DateTime.Now.TimeOfDay}:=> Session Stopped{Environment.NewLine}Key:{sessionKey}{Environment.NewLine}DataSource:{dataSource}{Environment.NewLine}-----------------{Environment.NewLine}";
-            });
+        this.rtxbNotifications.Invoke(() =>
+        {
+            this.rtxbNotifications.Text +=
+                $"{DateTime.Now.TimeOfDay}:=> Session Stopped{Environment.NewLine}Key:{sessionKey}{Environment.NewLine}DataSource:{dataSource}{Environment.NewLine}-----------------{Environment.NewLine}";
+        });
     }
 
     private void btnCreateNewSession_Click(object sender, EventArgs e)
@@ -193,82 +191,80 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
             return;
         }
 
-        Task.Run(
-            () =>
+        Task.Run(() =>
+        {
+            while (!this.initialise)
             {
-                while (!this.initialise)
+                try
                 {
-                    try
+                    SessionManagementService.SessionManagementServiceClient? sessionManagementClient = null;
+                    PacketWriterService.PacketWriterServiceClient? packetWriterManagementClient = null;
+                    PacketReaderService.PacketReaderServiceClient? packetReaderManagementClient = null;
+                    DataFormatManagerService.DataFormatManagerServiceClient? dataFormatManagementClient = null;
+                    ConnectionManagerService.ConnectionManagerServiceClient? connectionManagementClient = null;
+                    if (!this.chbUseRemoteStreamApi.Checked)
                     {
-                        SessionManagementService.SessionManagementServiceClient? sessionManagementClient = null;
-                        PacketWriterService.PacketWriterServiceClient? packetWriterManagementClient = null;
-                        PacketReaderService.PacketReaderServiceClient? packetReaderManagementClient = null;
-                        DataFormatManagerService.DataFormatManagerServiceClient? dataFormatManagementClient = null;
-                        ConnectionManagerService.ConnectionManagerServiceClient? connectionManagementClient = null;
-                        if (!this.chbUseRemoteStreamApi.Checked)
-                        {
-                            var streamingApiConfiguration = this.CreateConfiguration();
-                            if (streamingApiConfiguration is null)
-                            {
-                                return;
-                            }
-
-                            StreamingApiClient.Initialise(
-                                streamingApiConfiguration,
-                                new CancellationTokenSourceProvider(),
-                                new KafkaBrokerAvailabilityChecker(),
-                                new LoggingDirectoryProvider("/logs"));
-                            sessionManagementClient = StreamingApiClient.GetSessionManagementClient();
-                            packetWriterManagementClient = StreamingApiClient.GetPacketWriterClient();
-                            packetReaderManagementClient = StreamingApiClient.GetPacketReaderClient();
-                            dataFormatManagementClient = StreamingApiClient.GetDataFormatManagerClient();
-                            connectionManagementClient = StreamingApiClient.GetConnectionManagerClient();
-                        }
-                        else
-                        {
-                            RemoteStreamingApiClient.Initialise("localhost:13579");
-                            sessionManagementClient = RemoteStreamingApiClient.GetSessionManagementClient();
-                            packetWriterManagementClient = RemoteStreamingApiClient.GetPacketWriterClient();
-                            packetReaderManagementClient = RemoteStreamingApiClient.GetPacketReaderClient();
-                            dataFormatManagementClient = RemoteStreamingApiClient.GetDataFormatManagerClient();
-                            connectionManagementClient = RemoteStreamingApiClient.GetConnectionManagerClient();
-                        }
-
-                        this.sessionManagementPresenter = new SessionManagementPresenter(sessionManagementClient, new WindowsFormLogger(), this);
-                        this.dataFormatManagementPresenter = new DataFormatManagementPresenter(
-                            dataFormatManagementClient,
-                            packetReaderManagementClient,
-                            connectionManagementClient,
-                            new WindowsFormLogger(),
-                            this);
-                        this.readAndWriteManagementPresenter = new ReadAndWriteManagementPresenter(
-                            packetWriterManagementClient,
-                            packetReaderManagementClient,
-                            connectionManagementClient,
-                            this);
-                        this.initialise = true;
-                        this.grbSamples.Invoke(
-                            () =>
-                            {
-                                this.grbSamples.Text = "Samples";
-                                this.grbSamples.Enabled = true;
-                            });
-                    }
-                    catch (Exception ex)
-                    {
-                        if (MessageBox.Show(
-                                $"Error happned during connecting to stream api server please check the deployment.{Environment.NewLine}Do you want to retry agin in 5 seconds.",
-                                "error",
-                                MessageBoxButtons.YesNo) == DialogResult.No)
+                        var streamingApiConfiguration = this.CreateConfiguration();
+                        if (streamingApiConfiguration is null)
                         {
                             return;
                         }
 
-                        File.AppendAllText("log.txt", $"{DateTime.Now} Error:{ex} {Environment.NewLine}");
-                        new FrmLoading().ShowOnForm(this, TimeSpan.FromSeconds(5));
+                        StreamingApiClient.Initialise(
+                            streamingApiConfiguration,
+                            new CancellationTokenSourceProvider(),
+                            new KafkaBrokerAvailabilityChecker(),
+                            new LoggingDirectoryProvider("/logs"));
+                        sessionManagementClient = StreamingApiClient.GetSessionManagementClient();
+                        packetWriterManagementClient = StreamingApiClient.GetPacketWriterClient();
+                        packetReaderManagementClient = StreamingApiClient.GetPacketReaderClient();
+                        dataFormatManagementClient = StreamingApiClient.GetDataFormatManagerClient();
+                        connectionManagementClient = StreamingApiClient.GetConnectionManagerClient();
                     }
+                    else
+                    {
+                        RemoteStreamingApiClient.Initialise("localhost:13579");
+                        sessionManagementClient = RemoteStreamingApiClient.GetSessionManagementClient();
+                        packetWriterManagementClient = RemoteStreamingApiClient.GetPacketWriterClient();
+                        packetReaderManagementClient = RemoteStreamingApiClient.GetPacketReaderClient();
+                        dataFormatManagementClient = RemoteStreamingApiClient.GetDataFormatManagerClient();
+                        connectionManagementClient = RemoteStreamingApiClient.GetConnectionManagerClient();
+                    }
+
+                    this.sessionManagementPresenter = new SessionManagementPresenter(sessionManagementClient, new WindowsFormLogger(), this);
+                    this.dataFormatManagementPresenter = new DataFormatManagementPresenter(
+                        dataFormatManagementClient,
+                        packetReaderManagementClient,
+                        connectionManagementClient,
+                        new WindowsFormLogger(),
+                        this);
+                    this.readAndWriteManagementPresenter = new ReadAndWriteManagementPresenter(
+                        packetWriterManagementClient,
+                        packetReaderManagementClient,
+                        connectionManagementClient,
+                        this);
+                    this.initialise = true;
+                    this.grbSamples.Invoke(() =>
+                    {
+                        this.grbSamples.Text = "Samples";
+                        this.grbSamples.Enabled = true;
+                    });
                 }
-            });
+                catch (Exception ex)
+                {
+                    if (MessageBox.Show(
+                            $"Error happned during connecting to stream api server please check the deployment.{Environment.NewLine}Do you want to retry agin in 5 seconds.",
+                            "error",
+                            MessageBoxButtons.YesNo) == DialogResult.No)
+                    {
+                        return;
+                    }
+
+                    File.AppendAllText("log.txt", $"{DateTime.Now} Error:{ex} {Environment.NewLine}");
+                    new FrmLoading().ShowOnForm(this, TimeSpan.FromSeconds(5));
+                }
+            }
+        });
     }
 
     private void btnGoToDirectory_Click(object sender, EventArgs e)

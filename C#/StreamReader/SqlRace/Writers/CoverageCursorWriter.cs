@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// <copyright file="CoverageCursorWriter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MESL.SqlRace.Domain;
-
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 using Stream.Api.Stream.Reader.Abstractions;
 using Stream.Api.Stream.Reader.Dto;

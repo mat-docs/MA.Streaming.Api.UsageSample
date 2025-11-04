@@ -1,5 +1,5 @@
-﻿// <copyright file="ErrorConfigProcessor.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="ErrorConfigProcessor.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -65,7 +65,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             config.AddConversion(this.DefaultConversion);
 
             var channelsToAdd = new Dictionary<string, uint>();
-            var errorDefToAdd = new Dictionary<string, ErrorDefinition> ();
+            var errorDefToAdd = new Dictionary<string, ErrorDefinition>();
             foreach (var errorPacket in errorPackets)
             {
                 var parameterGroup = new ParameterGroup(errorPacket.ApplicationName);

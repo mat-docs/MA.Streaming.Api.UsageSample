@@ -1,5 +1,5 @@
-﻿// <copyright file="SampleCustomObject.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SampleCustomObject.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 namespace MA.Streaming.Api.UsageSample.ReadAndWriteManagement;
 
@@ -18,10 +18,6 @@ public class SampleCustomObject
     {
     }
 
-    public long RunId { get; }
-
-    public DateTime CreationTime { get; }
-
     private SampleCustomObject(long runId, DateTime creationTime, uint order, byte[] content)
     {
         this.RunId = runId;
@@ -30,9 +26,15 @@ public class SampleCustomObject
         this.Content = content;
     }
 
+    public long RunId { get; }
+
+    public DateTime CreationTime { get; }
+
     public byte[] Content { get; }
 
     public uint Order { get; }
+
+    public static uint MinimumObjectSize => SizeOfRunIdBytes + SizeOfDateTimeTicks + SizeOfUintOrder + 1;
 
     public static SampleCustomObject Deserialize(byte[] serializedBytes)
     {
@@ -43,8 +45,6 @@ public class SampleCustomObject
         Array.Copy(serializedBytes, SizeOfDateTimeTicks + SizeOfUintOrder, content, 0, content.Length);
         return new SampleCustomObject(runId, creationTime, order, content);
     }
-
-    public static uint MinimumObjectSize => SizeOfRunIdBytes + SizeOfDateTimeTicks + SizeOfUintOrder + 1;
 
     public byte[] Serialize()
     {

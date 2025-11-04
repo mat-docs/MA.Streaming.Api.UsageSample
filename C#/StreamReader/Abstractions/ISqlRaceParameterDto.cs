@@ -1,5 +1,5 @@
-﻿// <copyright file="ISqlRaceParameterDto.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="ISqlRaceParameterDto.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 namespace Stream.Api.Stream.Reader.Abstractions
 {

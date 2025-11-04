@@ -1,5 +1,5 @@
-﻿// <copyright file="SynchroSqlRaceWriter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SynchroSqlRaceWriter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MESL.SqlRace.Domain;
 

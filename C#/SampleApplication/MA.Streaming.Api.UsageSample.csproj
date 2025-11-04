@@ -16,6 +16,5 @@
 		<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.3.6.33" />
 	</ItemGroup>
 
-	
 
 </Project>

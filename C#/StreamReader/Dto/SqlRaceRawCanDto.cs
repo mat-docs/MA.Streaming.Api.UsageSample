@@ -1,7 +1,5 @@
-﻿// <copyright file="SqlRaceRawCanDto.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
-
-using MA.Streaming.OpenData;
+﻿// <copyright file="SqlRaceRawCanDto.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Stream.Api.Stream.Reader.Abstractions;
 
@@ -9,7 +7,7 @@ namespace Stream.Api.Stream.Reader.Dto
 {
     public class SqlRaceRawCanDto : ISqlRaceDto, ISqlRaceRawCanDto
     {
-        public SqlRaceRawCanDto(long timestamp, ushort canBus, uint canId, byte[] payload,byte canType)
+        public SqlRaceRawCanDto(long timestamp, ushort canBus, uint canId, byte[] payload, byte canType)
         {
             this.DataType = "Raw Can";
             this.Timestamp = timestamp;
