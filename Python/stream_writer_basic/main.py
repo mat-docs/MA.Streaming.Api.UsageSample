@@ -90,7 +90,10 @@ def main():
     # Create a new session
     create_session_response = session_stub.CreateSession(
         api_pb2.CreateSessionRequest(
-            data_source=DATA_SOURCE
+            data_source=DATA_SOURCE,
+            identifier=f"TEST SESSION {datetime.datetime.now()}",
+            type="Session",
+            version=1
         )
     )
     session_key = create_session_response.session_key
