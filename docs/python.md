@@ -82,7 +82,7 @@ services:
       - ./configs:/app/Configs
 
   key-generator:
-    image: atlasplatformdocker/keygenerator-proto-server-dev:1.3.6.12
+    image: atlasplatformdocker/keygenerator-proto-server:latest
     container_name: key-generator-server
     networks:
       kafka_net_interal:
@@ -192,6 +192,26 @@ python -m pip install grpcio-tools
 ### Compiling Protocol Buffers
 
 Python definitions can be generated from the proto files. The latest proto file can be found on [GitHub](https://github.com/Software-Products/MA.DataPlatforms.Protocol).
+
+#### Using the Provided bat File
+
+1. Clone the protocol repository:
+   ```bash
+   git clone https://github.com/Software-Products/MA.DataPlatforms.Protocol.git
+   ```
+
+2. Open the ``` gen_proto.bat ``` file and modify the ``` path_to_proto ``` variable:
+``` batch
+SET path_to_proto="path/to/proto/repo"
+```
+
+3. Navigate to the ``` gen_proto.bat ``` file and run it:
+``` powershell
+cd MA.Streaming.Api.SampleUsage/Python
+./gen_proto.bat
+```
+
+#### Compiling Protocol Buffers Manually
 
 1. Clone the protocol repository:
    ```bash

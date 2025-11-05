@@ -66,7 +66,7 @@ services:
       - kafka 
 
   stream-api-server:
-    image: atlasplatformdocker/streaming-proto-server-host-dev:1.3.6.33
+    image: atlasplatformdocker/streaming-proto-server-host:latest
     container_name: stream-api-server
     networks:
       kafka_net_interal:
@@ -82,7 +82,7 @@ services:
       - ./configs:/app/Configs
 
   key-generator:
-    image: atlasplatformdocker/keygenerator-proto-server-dev:1.3.6.12
+    image: atlasplatformdocker/keygenerator-proto-server:latest
     container_name: key-generator-server
     networks:
       kafka_net_interal:
