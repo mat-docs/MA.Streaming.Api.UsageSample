@@ -113,7 +113,7 @@ Create a `configs` directory and add a Stream API configuration file:
 **configs/AppConfig.json:**
 ```json
 {
-  "StreamCreationStrategy": "PartitionBased",
+  "StreamCreationStrategy": 1,
   "BrokerUrl": "kafka:9092",
   "PartitionMappings": [
     {
@@ -216,10 +216,10 @@ docker-compose down -v
 The sample application uses the following key packages:
 
 ```xml
-<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="1.3.6.33" />
-<PackageReference Include="MA.Streaming.Proto.Client.Local" Version="1.3.6.33" />
-<PackageReference Include="MA.Streaming.Core" Version="1.3.6.33" />
-<PackageReference Include="MESL.SQLRace.API" Version="2.1.25213.3" />
+<PackageReference Include="MA.Streaming.Proto.Client.Remote" Version="x.x.x.x" />
+<PackageReference Include="MA.Streaming.Proto.Client.Local" Version="x.x.x.x" />
+<PackageReference Include="MA.Streaming.Core" Version="x.x.x.x" />
+<PackageReference Include="MESL.SQLRace.API" Version="x.x.x.x" />
 ```
 
 ### Building the Project
@@ -264,8 +264,6 @@ var configuration = new StreamingApiConfiguration(
         new PartitionMapping("Stream2", 2)
     },
     streamApiPort: 13579,
-    enableLogging: true,
-    enableMetrics: true,
     useRemoteKeyGenerator: true,
     remoteKeyGeneratorServiceAddress: "localhost:15379",
     batchingResponses: true
@@ -305,8 +303,8 @@ var request = new CreateSessionRequest
 };
 
 // Add session details
-request.Details.Add("Driver", "Lewis Hamilton");
-request.Details.Add("Track", "Silverstone");
+request.Details.Add("Driver", "Driver Name");
+request.Details.Add("Track", "Track Name");
 request.Details.Add("Weather", "Sunny");
 
 // Associate with existing sessions
@@ -633,13 +631,13 @@ for (int i = 0; i < 3; i++)
     row.DoubleSamples.Samples.Add(new DoubleSample 
     { 
         Value = Math.Sin(i), 
-        Status = DataStatus.DataStatusValid 
+        Status = DataStatus.Valid 
     });
     
     row.DoubleSamples.Samples.Add(new DoubleSample 
     { 
         Value = Math.Cos(i), 
-        Status = DataStatus.DataStatusValid 
+        Status = DataStatus.Valid 
     });
     
     rowData.Rows.Add(row);
@@ -678,7 +676,7 @@ var statusMessage = new SystemStatusMessage
 {
     Service = "DataAcquisition",
     DataSource = "SampleDataSource",
-    Type = SystemStatusType.SystemStatusTypeStatus
+    Type = SystemStatusType.Status
 };
 
 var infoPacket = new Packet
@@ -693,56 +691,87 @@ var infoPacket = new Packet
 var infoRequest = new WriteInfoPacketRequest
 {
     Message = infoPacket,
-    Type = InfoType.InfoTypeSystemStatus
+    Type = InfoType.SystemStatus
 };
 
 var infoResponse = packetWriterClient.WriteInfoPacket(infoRequest);
 Console.WriteLine("Info packet written successfully");
 ```
 
-#### Streaming Data Packets
+#### Streaming Data Packets (Batch Writing)
+
+For high-throughput scenarios, use client-streaming to send multiple packets efficiently:
 
 ```csharp
-async Task WriteDataStream()
+async Task WriteDataStreamBatched()
 {
-    var client = packetWriterClient.WriteDataPackets();
+    var batchStream = packetWriterClient.WriteDataPackets();
     
-    for (int i = 0; i < 1000; i++)
+    try
     {
-        // Create row data packet
-        var rowData = new RowDataPacket();
-        // ... populate rowData ...
+        int batchSize = 100;
+        var batch = new List<DataPacketDetails>();
+        int totalSent = 0;
         
-        var packet = new Packet
+        Console.WriteLine("Starting to send packets via stream...");
+        
+        for (int i = 0; i < 1000; i++)
         {
-            Type = "RowData",
-            SessionKey = sessionKey,
-            IsEssential = false,
-            Content = ByteString.CopyFrom(rowData.ToByteArray())
-        };
-        
-        var packetDetails = new DataPacketDetails
-        {
-            Message = packet,
-            DataSource = "SampleDataSource",
-            Stream = "Stream1",
-            SessionKey = sessionKey
-        };
-        
-        var request = new WriteDataPacketsRequest();
-        request.Details.Add(packetDetails);
-        
-        await client.RequestStream.WriteAsync(request);
-        
-        if (i % 100 == 0)
-        {
-            Console.WriteLine($"Written {i} packets");
+            // Create row data packet
+            var rowData = new RowDataPacket();
+            // ... populate rowData ...
+            
+            var packet = new Packet
+            {
+                Type = "RowData",
+                SessionKey = sessionKey,
+                IsEssential = false,
+                Content = ByteString.CopyFrom(rowData.ToByteArray())
+            };
+            
+            var packetDetails = new DataPacketDetails
+            {
+                Message = packet,
+                DataSource = "SampleDataSource",
+                Stream = "Stream1",
+                SessionKey = sessionKey
+            };
+            
+            batch.Add(packetDetails);
+            
+            // When batch is full, send it
+            if (batch.Count >= batchSize)
+            {
+                var request = new WriteDataPacketsRequest();
+                request.Details.AddRange(batch);
+                
+                await batchStream.RequestStream.WriteAsync(request);
+                
+                totalSent += batch.Count;
+                Console.WriteLine($"Sent batch {(totalSent / batchSize)} with {batch.Count} packets...");
+                batch.Clear();
+            }
         }
+        
+        // Send remaining packets
+        if (batch.Count > 0)
+        {
+            var request = new WriteDataPacketsRequest();
+            request.Details.AddRange(batch);
+            
+            await batchStream.RequestStream.WriteAsync(request);
+            totalSent += batch.Count;
+            Console.WriteLine($"Sent final batch with {batch.Count} packets...");
+        }
+        
+        Console.WriteLine($"Total packets sent: {totalSent}. Closing stream...");
     }
-    
-    await client.RequestStream.CompleteAsync();
-    var response = await client;
-    Console.WriteLine("Data stream written successfully");
+    finally
+    {
+        await batchStream.RequestStream.CompleteAsync();
+        var response = await batchStream;
+        Console.WriteLine($"Stream closed. Server response received.");
+    }
 }
 ```
 
@@ -1030,7 +1059,7 @@ using MA.Streaming.KeyGenerator;
 // Generate string key
 var stringRequest = new GenerateUniqueKeyRequest
 {
-    Type = KeyType.KeyTypeString
+    Type = KeyType.string
 };
 
 var stringResponse = keyGeneratorClient.GenerateUniqueKey(stringRequest);
@@ -1043,7 +1072,7 @@ if (stringResponse.KeyCase == GenerateUniqueKeyResponse.KeyOneofCase.StringKey)
 // Generate ulong key
 var ulongRequest = new GenerateUniqueKeyRequest
 {
-    Type = KeyType.KeyTypeUlong
+    Type = KeyType.Ulong
 };
 
 var ulongResponse = keyGeneratorClient.GenerateUniqueKey(ulongRequest);

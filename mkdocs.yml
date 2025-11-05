@@ -4,7 +4,6 @@ nav:
     - Home: index.md
     - Python Implementation: python.md
     - C# Implementation: csharp.md
-    - API Reference: api.md
 
 theme:
   name: material

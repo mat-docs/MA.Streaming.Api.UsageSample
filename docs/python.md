@@ -66,7 +66,7 @@ services:
       - kafka 
 
   stream-api-server:
-    image: atlasplatformdocker/streaming-proto-server-host-dev:1.3.6.33
+    image: atlasplatformdocker/streaming-proto-server-host:latest
     container_name: stream-api-server
     networks:
       kafka_net_interal:
@@ -118,7 +118,7 @@ Create `configs/AppConfig.json`:
 
 ```json
 {
-  "StreamCreationStrategy": "PartitionBased",
+  "StreamCreationStrategy": 1,
   "BrokerUrl": "kafka:9092",
   "PartitionMappings": [
     {
@@ -134,8 +134,7 @@ Create `configs/AppConfig.json`:
   "EnableLogging": true,
   "EnableMetrics": true,
   "UseRemoteKeyGenerator": true,
-  "RemoteKeyGeneratorServiceAddress": "key-generator:15379",
-  "BatchingResponses": true
+  "RemoteKeyGeneratorServiceAddress": "key-generator:15379"
 }
 ```
 
@@ -167,7 +166,7 @@ Test the Stream API connection:
 
 ```python
 import grpc
-from ma.streaming.api.v1 import api_pb2_grpc
+from ma.streaming.api.v1 import api_pb2, api_pb2_grpc
 
 # Test connection to Stream API
 try:
@@ -194,21 +193,139 @@ python -m pip install grpcio-tools
 
 Python definitions can be generated from the proto files. The latest proto file can be found on [GitHub](https://github.com/Software-Products/MA.DataPlatforms.Protocol).
 
-1. Clone the protocol repository
-2. Update the `path_to_proto` parameter in `gen_proto.bat`
-3. Run the compilation script:
+1. Clone the protocol repository:
+   ```bash
+   git clone https://github.com/Software-Products/MA.DataPlatforms.Protocol.git
+   ```
 
-```bash
-gen_proto.bat
+2. Navigate to the cloned repository directory:
+   ```bash
+   cd MA.DataPlatforms.Protocol
+   ```
+
+3. Verify the directory structure exists:
+   ```powershell
+   # Check if the proto directories exist
+   ls proto\ma\streaming\api\v1
+   ls proto\ma\streaming\open_data\v1
+   ```
+
+4. Generate the Python gRPC code from the proto files:
+
+   **On Windows (PowerShell):**
+   ```powershell
+   python -m grpc_tools.protoc -Iproto --python_out=. --grpc_python_out=. proto\ma\streaming\api\v1\api.proto proto\ma\streaming\open_data\v1\open_data.proto
+   ```
+
+   **On Linux/Mac:**
+   ```bash
+   python -m grpc_tools.protoc -Iproto --python_out=. --grpc_python_out=. proto/ma/streaming/api/v1/api.proto proto/ma/streaming/open_data/v1/open_data.proto
+   ```
+
+   **If there are multiple proto files to compile:**
+   
+   Windows PowerShell:
+   ```powershell
+   Get-ChildItem -Path proto\ma\streaming\api\v1\*.proto | ForEach-Object { python -m grpc_tools.protoc -Iproto --python_out=. --grpc_python_out=. $_.FullName }
+   Get-ChildItem -Path proto\ma\streaming\open_data\v1\*.proto | ForEach-Object { python -m grpc_tools.protoc -Iproto --python_out=. --grpc_python_out=. $_.FullName }
+   ```
+
+   Linux/Mac:
+   ```bash
+   for proto_file in proto/ma/streaming/api/v1/*.proto proto/ma/streaming/open_data/v1/*.proto; do
+     python -m grpc_tools.protoc -Iproto --python_out=. --grpc_python_out=. "$proto_file"
+   done
+   ```
+
+5. Move the generated files to your project directory:
+
+**On Windows (PowerShell):**
+```powershell
+# Create your project directory structure
+New-Item -ItemType Directory -Force -Path my_stream_project\ma\streaming\api\v1
+New-Item -ItemType Directory -Force -Path my_stream_project\ma\streaming\open_data\v1
+
+# Copy the generated Python files
+Copy-Item ma\streaming\api\v1\*_pb2.py my_stream_project\ma\streaming\api\v1\
+Copy-Item ma\streaming\api\v1\*_pb2_grpc.py my_stream_project\ma\streaming\api\v1\
+Copy-Item ma\streaming\open_data\v1\*_pb2.py my_stream_project\ma\streaming\open_data\v1\
+Copy-Item ma\streaming\open_data\v1\*_pb2_grpc.py my_stream_project\ma\streaming\open_data\v1\
+
+# Add __init__.py files to make them Python packages
+New-Item -ItemType File -Path my_stream_project\ma\__init__.py
+New-Item -ItemType File -Path my_stream_project\ma\streaming\__init__.py
+New-Item -ItemType File -Path my_stream_project\ma\streaming\api\__init__.py
+New-Item -ItemType File -Path my_stream_project\ma\streaming\api\v1\__init__.py
+New-Item -ItemType File -Path my_stream_project\ma\streaming\open_data\__init__.py
+New-Item -ItemType File -Path my_stream_project\ma\streaming\open_data\v1\__init__.py
 ```
 
-This generates Python modules in the `ma/streaming` directory that can be imported in your code.
+**On Linux/Mac:**
+```bash
+# Create your project directory structure
+mkdir -p my_stream_project/ma/streaming/api/v1
+mkdir -p my_stream_project/ma/streaming/open_data/v1
+
+# Copy the generated Python files
+cp ma/streaming/api/v1/*_pb2.py my_stream_project/ma/streaming/api/v1/
+cp ma/streaming/api/v1/*_pb2_grpc.py my_stream_project/ma/streaming/api/v1/
+cp ma/streaming/open_data/v1/*_pb2.py my_stream_project/ma/streaming/open_data/v1/
+cp ma/streaming/open_data/v1/*_pb2_grpc.py my_stream_project/ma/streaming/open_data/v1/
+
+# Add __init__.py files to make them Python packages
+touch my_stream_project/ma/__init__.py
+touch my_stream_project/ma/streaming/__init__.py
+touch my_stream_project/ma/streaming/api/__init__.py
+touch my_stream_project/ma/streaming/api/v1/__init__.py
+touch my_stream_project/ma/streaming/open_data/__init__.py
+touch my_stream_project/ma/streaming/open_data/v1/__init__.py
+```
+
+This will generate the necessary Python files (`*_pb2.py` and `*_pb2_grpc.py`) in the appropriate directories.
+
 
 ## Core Concepts
 
 ### Stream API Client
 
-The `StreamApi` class provides access to all service stubs:
+You have two options for accessing the Stream API services:
+
+#### Option 1: Using the StreamApi Helper Class (Recommended)
+
+Create a `stream_api.py` file in your project to organize all services:
+
+```python
+"""All the Stream API services organised in a single class."""
+
+import grpc
+from ma.streaming.api.v1 import api_pb2_grpc
+
+
+class StreamApi:
+    """All the Stream API services organised in a single class."""
+
+    def __init__(self, address="localhost:13579"):
+        self.channel = grpc.insecure_channel(address)
+
+        # Create the gRPC clients
+        self.connection_manager_service_stub = (
+            api_pb2_grpc.ConnectionManagerServiceStub(self.channel)
+        )
+        self.session_management_service_stub = (
+            api_pb2_grpc.SessionManagementServiceStub(self.channel)
+        )
+        self.data_format_manager_service_stub = (
+            api_pb2_grpc.DataFormatManagerServiceStub(self.channel)
+        )
+        self.packet_reader_service_stub = api_pb2_grpc.PacketReaderServiceStub(
+            self.channel
+        )
+        self.packet_writer_service_stub = api_pb2_grpc.PacketWriterServiceStub(
+            self.channel
+        )
+```
+
+Then use it in your application:
 
 ```python
 from stream_api import StreamApi
@@ -219,6 +336,25 @@ data_format_stub = stream_api.data_format_manager_service_stub
 packet_writer_stub = stream_api.packet_writer_service_stub
 packet_reader_stub = stream_api.packet_reader_service_stub
 connection_manager_stub = stream_api.connection_manager_service_stub
+```
+
+#### Option 2: Creating Stubs Directly
+
+Alternatively, create the service stubs directly without a helper class:
+
+```python
+import grpc
+from ma.streaming.api.v1 import api_pb2, api_pb2_grpc
+
+# Create gRPC channel
+channel = grpc.insecure_channel('localhost:13579')
+
+# Create service stubs
+session_stub = api_pb2_grpc.SessionManagementServiceStub(channel)
+data_format_stub = api_pb2_grpc.DataFormatManagerServiceStub(channel)
+packet_writer_stub = api_pb2_grpc.PacketWriterServiceStub(channel)
+packet_reader_stub = api_pb2_grpc.PacketReaderServiceStub(channel)
+connection_manager_stub = api_pb2_grpc.ConnectionManagerServiceStub(channel)
 ```
 
 ## Usage Examples
@@ -250,8 +386,8 @@ create_session_response = session_stub.CreateSession(
         identifier=f"Test Session {datetime.datetime.now()}",
         associate_session_key=["parent-session-key"],
         details={
-            "Driver": "Lewis Hamilton",
-            "Track": "Silverstone",
+            "Driver": "Driver Name",
+            "Track": "Track Name",
             "Weather": "Sunny"
         }
     )
@@ -281,9 +417,9 @@ if end_response.success:
     end_session_packet = end_response.end_session
 ```
 
-#### Getting Active Sessions
+#### Getting All Sessions
 
-Query all active sessions for a data source:
+Query all sessions for a data source:
 
 ```python
 sessions_response = session_stub.GetCurrentSessions(
@@ -299,7 +435,7 @@ if sessions_response.success:
 
 #### Retrieving Session Information
 
-Get comprehensive session details:
+Get session details:
 
 ```python
 import time
@@ -591,30 +727,85 @@ print("Info packet written successfully")
 
 #### Streaming Data Packets
 
-Continuously write multiple packets:
+**Method 1: Batch multiple packets in each request (Recommended)**
+
+This approach uses client-streaming to send multiple packets efficiently. The generator creates the stream, keeps it alive while sending batches, and closes it when exhausted:
 
 ```python
-def write_data_stream():
-    def generate_packets():
+import os
+import grpc
+
+def write_data_stream_batched():
+    """
+    Properly use WriteDataPackets streaming API:
+    1. Create a generator that yields batches
+    2. Pass generator to WriteDataPackets - this creates the stream
+    3. Generator exhaustion closes the stream
+    4. Server then sends response after stream closes
+    """
+    
+    def generate_and_send_batches():
+        """Generator that keeps the stream alive while sending batches"""
+        batch_size = 100
+        batch = []
+        total_sent = 0
+        
+        print("Starting to send packets via stream...")
+        
         for i in range(1000):
             packet = open_data_pb2.Packet(
                 type="RowData",
                 session_key=session_key,
                 is_essential=False,
-                content=generate_sample_data(i)
+                content=os.urandom(16),
             )
             
             packet_details = api_pb2.DataPacketDetails(
                 message=packet,
                 data_source=DATA_SOURCE,
                 stream="Stream1",
-                session_key=session_key
+                session_key=session_key,
             )
             
-            yield api_pb2.WriteDataPacketsRequest(details=[packet_details])
+            batch.append(packet_details)
+            
+            # When batch is full, yield it (keeps stream alive)
+            if len(batch) >= batch_size:
+                print(f"Sending batch {(total_sent // batch_size) + 1} with {len(batch)} packets...")
+                yield api_pb2.WriteDataPacketsRequest(details=batch)
+                total_sent += len(batch)
+                batch = []
+        
+        # Send remaining packets
+        if batch:
+            print(f"Sending final batch with {len(batch)} packets...")
+            yield api_pb2.WriteDataPacketsRequest(details=batch)
+            total_sent += len(batch)
+        
+        print(f"Total packets sent: {total_sent}. Stream will now close.")
+        # When generator ends, stream closes automatically
     
-    response = packet_writer_stub.WriteDataPackets(generate_packets())
-    print("Data stream written successfully")
+    try:
+        # Call WriteDataPackets with generator
+        # The generator keeps stream alive, then closes when exhausted
+        # Server processes in background and sends response after stream closes
+        print("Creating stream and sending batches...")
+        response = packet_writer_stub.WriteDataPackets(
+            generate_and_send_batches(),
+            timeout=10,  # Add timeout since server uses background processing
+        )
+        print(f"Stream closed. Server response received: {response}")
+    except grpc.RpcError as e:
+        if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+            print("Timeout waiting for response, but packets were sent successfully")
+            print("(Server uses background processing and may not send timely response)")
+        else:
+            print(f"gRPC Error: {e.code()} - {e.details()}")
+    except Exception as e:
+        print(f"Error: {type(e).__name__}: {e}")
+
+# Call the function
+write_data_stream_batched()
 ```
 
 ### 6. Reading Data Packets
