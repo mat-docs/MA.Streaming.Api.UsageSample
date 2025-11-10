@@ -1,5 +1,5 @@
-﻿// <copyright file="SqlRaceSynchroDto.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SqlRaceSynchroDto.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Stream.Api.Stream.Reader.Abstractions;
 

@@ -42,7 +42,7 @@ class StreamReaderSql:
         self.events_with_missing_config = set()
         self.add_missing_config = True
         self.connection = None
-        self.data_source = "SampleDataSource"
+        self.data_source = "Default"
         self.grpc_address = "localhost:13579"
         self.stream_api = StreamApi(self.grpc_address)
         self.session_key = None
@@ -541,11 +541,16 @@ class StreamReaderSql:
             self.is_session_complete = session_info_response.is_complete
 
         # Establish a new connection
+        stream_offsets = []
+        for stream in session_info_response.streams:
+            stream_offsets.append(session_info_response.topic_partition_offsets[f"{self.data_source}.{stream}:0"])
         connection_details = api_pb2.ConnectionDetails(
             data_source=self.data_source,
-            session=self.session_key,
+            session_key=self.session_key,
             main_offset=session_info_response.main_offset,
             essentials_offset=session_info_response.essentials_offset,
+            streams=session_info_response.streams,
+            stream_offsets=stream_offsets,
         )
 
         connection_response = connection_management_stub.NewConnection(

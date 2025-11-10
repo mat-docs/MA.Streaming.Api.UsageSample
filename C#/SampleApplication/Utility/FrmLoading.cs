@@ -1,5 +1,5 @@
-﻿// <copyright file="FrmLoading.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="FrmLoading.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using System.Timers;
 
@@ -17,12 +17,6 @@ public partial class FrmLoading : Form
         this.timer.Elapsed += this.Timer_Elapsed;
     }
 
-    private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
-    {
-        this.Invoke((MethodInvoker)this.Close);
-        this.timer.Enabled = false;
-    }
-
     public void ShowOnForm(Form parentForm, TimeSpan? showTime = null)
     {
         this.StartPosition = FormStartPosition.Manual;
@@ -35,5 +29,11 @@ public partial class FrmLoading : Form
         }
 
         this.ShowDialog();
+    }
+
+    private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
+    {
+        this.Invoke((MethodInvoker)this.Close);
+        this.timer.Enabled = false;
     }
 }

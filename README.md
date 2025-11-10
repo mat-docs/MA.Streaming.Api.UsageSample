@@ -7,6 +7,6 @@ Stream API is a standard API to expose streaming data from SECU units and abstra
 
 Stream API is responsible for publishing and consuming data from the Kafka broker. Created under the gRPC framework, it allows clients to communicate to a server which handles the Kafka communication. 
 
-It is language and platform agnostic. However, Nuget packages for the C# implementation is provided to registered users in the [McLaren Applied Nuget Repository](https://github.com/mat-docs/packages). Proto files are provided in the form of Nuget packages as part of the [McLaren Applied Nuget Repository](https://github.com/mat-docs/packages).
+It is language and platform agnostic. However, Nuget packages for the C# implementation is provided to registered users in the [Motion Applied Nuget Repository](https://github.com/mat-docs/packages). Proto files are provided in the form of Nuget packages as part of the [Motion Applied Nuget Repository](https://github.com/mat-docs/packages).
 
-See the [API Documentation](https://atlas.mclarenapplied.com/secu4/open_streaming_architecture/stream_api/) for more details.
+See the [API Documentation](https://atlas.motionapplied.com/secu4/open_streaming_architecture/stream_api/) for more details.

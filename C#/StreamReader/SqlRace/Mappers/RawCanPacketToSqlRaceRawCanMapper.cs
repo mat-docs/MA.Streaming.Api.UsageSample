@@ -1,5 +1,5 @@
-﻿// <copyright file="RawCanPacketToSqlRaceRawCanMapper.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="RawCanPacketToSqlRaceRawCanMapper.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MA.Streaming.OpenData;
 
@@ -18,6 +18,7 @@ namespace Stream.Api.Stream.Reader.SqlRace.Mappers
             {
                 Console.WriteLine($"Packet with empty payload was sent.");
             }
+
             return new SqlRaceRawCanDto(packet.Timestamp.ToSqlRaceTime(), (ushort)packet.Bus, packet.CanId, packet.Payload.ToByteArray(), canTypeBytes);
         }
     }

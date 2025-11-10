@@ -1,5 +1,5 @@
-﻿// <copyright file="SqlRaceSession.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SqlRaceSession.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MA.Streaming.API;
 using MA.Streaming.OpenData;
@@ -16,6 +16,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
 {
     internal class SqlRaceSession : ISession
     {
+        private const byte TriggerSourceStart = 0;
+        private const string DefaultLapName = "Out Lap";
         private readonly StreamApiClient streamApiClient;
         private readonly List<IStreamApiReader> streamApiReaders;
         private readonly string sessionKey;
@@ -23,8 +25,6 @@ namespace Stream.Api.Stream.Reader.SqlRace
         private readonly ISqlRaceSessionWriter sqlRaceWriter;
         private readonly IClientSession clientSession;
         private readonly IPacketHandler<Packet> packetHandler;
-        private const byte TriggerSourceStart = 0;
-        private const string DefaultLapName = "Out Lap";
 
         public SqlRaceSession(
             StreamApiClient streamApiClient,
@@ -57,7 +57,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
             }
 
             this.packetHandler.Stop();
-            Console.WriteLine($"Setting start and end time to {this.sqlRaceWriter.StartTimestamp.ToDateTime().TimeOfDay} and {this.sqlRaceWriter.EndTimestamp.ToDateTime().TimeOfDay}");
+            Console.WriteLine(
+                $"Setting start and end time to {this.sqlRaceWriter.StartTimestamp.ToDateTime().TimeOfDay} and {this.sqlRaceWriter.EndTimestamp.ToDateTime().TimeOfDay}");
             this.clientSession.Session.SetStartTime(this.sqlRaceWriter.StartTimestamp);
             this.clientSession.Session.SetEndTime(this.sqlRaceWriter.EndTimestamp);
             this.clientSession.Session.SetSessionTimerange(this.sqlRaceWriter.StartTimestamp, this.sqlRaceWriter.EndTimestamp);
@@ -92,12 +93,11 @@ namespace Stream.Api.Stream.Reader.SqlRace
                 {
                     var streamList = new List<Tuple<string, long>>();
 
-                    foreach (var newStreamAndOffset in newStreams.Select(
-                                 newStream => new Tuple<string, long>(
-                                     newStream,
-                                     sessionInfo.TopicPartitionOffsets.GetValueOrDefault(
-                                         $"{sessionInfo.DataSource}.{newStream}:0",
-                                         0))))
+                    foreach (var newStreamAndOffset in newStreams.Select(newStream => new Tuple<string, long>(
+                                 newStream,
+                                 sessionInfo.TopicPartitionOffsets.GetValueOrDefault(
+                                     $"{sessionInfo.DataSource}.{newStream}:0",
+                                     0))))
                     {
                         streamList.Add(newStreamAndOffset);
                         this.streamsOffsetDictionary.Add(newStreamAndOffset.Item1, newStreamAndOffset.Item2);
@@ -108,7 +108,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
                         DataSource = sessionInfo.DataSource,
                         EssentialsOffset = sessionInfo.EssentialsOffset,
                         MainOffset = sessionInfo.MainOffset,
-                        Session = this.sessionKey,
+                        SessionKey = this.sessionKey,
                         StreamOffsets =
                         {
                             streamList.Select(x => x.Item2).ToList()

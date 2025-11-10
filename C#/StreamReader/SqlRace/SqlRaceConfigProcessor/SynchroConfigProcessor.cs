@@ -1,5 +1,5 @@
-﻿// <copyright file="SynchroConfigProcessor.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SynchroConfigProcessor.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -38,12 +38,11 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
                 return;
             }
 
-            newParameters.ForEach(
-                x =>
-                {
-                    this.synchroConfigProcessor.Add(x);
-                    this.parametersAlreadyProcessed.Add(x);
-                });
+            newParameters.ForEach(x =>
+            {
+                this.synchroConfigProcessor.Add(x);
+                this.parametersAlreadyProcessed.Add(x);
+            });
         }
 
         private Task ConfigProcessor(IReadOnlyList<string> parameterList)

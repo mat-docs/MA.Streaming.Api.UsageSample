@@ -1,5 +1,5 @@
-// <copyright file="SessionManagementPresenter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+// <copyright file="SessionManagementPresenter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MA.Common.Abstractions;
 using MA.Streaming.API;

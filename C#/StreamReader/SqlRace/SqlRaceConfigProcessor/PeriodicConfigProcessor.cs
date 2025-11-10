@@ -1,5 +1,5 @@
-﻿// <copyright file="PeriodicConfigProcessor.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="PeriodicConfigProcessor.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -117,7 +117,6 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
                 Console.WriteLine($"Failed to create config {configSetIdentifier} for {parameterIdentifiers.Count} periodic parameters due to {ex.Message}.");
                 return Task.CompletedTask;
             }
-            
 
             Console.WriteLine($"Commiting config {config.Identifier}.");
             try

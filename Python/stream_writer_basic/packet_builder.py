@@ -46,6 +46,7 @@ class SinWaveGenerator:
         self.time_ns = time.time_ns()
         self.frequency = 1000  # Hz
         self.param_identifiers = ["Sin:MyApp", "Cos:MyApp"]
+        self.app_name = "MyApp"
 
     @property
     def interval(self):
@@ -73,28 +74,48 @@ class SinWaveGenerator:
         return data_packet
 
     def build_configuration_packet(self, config_id: str):
+        """ Build a configuration packet. """
         parameter_definitions = []
         for param_id in self.param_identifiers:
             param_def = self.build_parameter_definition_packet(*param_id.split(":"))
             parameter_definitions.append(param_def)
+
+        app_groups = self.build_group_definition_packet(self.app_name)
         config_packet = open_data_pb2.ConfigurationPacket(
             config_id=config_id,
             parameter_definitions=parameter_definitions,
+            group_definitions=app_groups,
         )
         return config_packet
 
     def build_parameter_definition_packet(self, name: str, app: str):
+        """ Build a parameter definition. """
+        # Sample on how to build a new parameter.
+        # Groups should only be used if your parameter is in a subgroup.
         param_def = open_data_pb2.ParameterDefinition(
             identifier=f"{name}:{app}",
             name=name,
             application_name=app,
             description="",
-            groups=[""],
             units="m",
             data_type=open_data_pb2.DATA_TYPE_FLOAT64,
-            format_string="6.3f",
+            format_string="%6.3f",
             frequencies=[self.frequency],
             max_value=1,
             min_value=-1,
         )
         return param_def
+
+    @staticmethod
+    def build_group_definition_packet(app_name: str):
+        """ Build a group definition. """
+        # You always have to have a parameter group for the stream recorder.
+        # You can nest group definitions together to create subgroups.
+        app_group = open_data_pb2.GroupDefinition(
+            identifier=app_name,
+            application_name=app_name,
+            name=app_name,
+            description=app_name,
+            groups=[])
+
+        return [app_group]

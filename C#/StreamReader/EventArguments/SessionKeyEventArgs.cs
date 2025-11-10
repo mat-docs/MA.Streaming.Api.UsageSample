@@ -1,5 +1,5 @@
-﻿// <copyright file="SessionKeyEventArgs.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SessionKeyEventArgs.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 namespace Stream.Api.Stream.Reader.EventArguments
 {

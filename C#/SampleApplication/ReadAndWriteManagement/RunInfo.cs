@@ -1,5 +1,5 @@
-﻿// <copyright file="RunInfo.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="RunInfo.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Grpc.Core;
 
@@ -9,15 +9,9 @@ namespace MA.Streaming.Api.UsageSample.ReadAndWriteManagement;
 
 public class RunInfo
 {
+    private readonly IClientStreamWriter<WriteDataPacketsRequest> writerStream;
     private int receivedCounter;
     private int publishCounter;
-    private readonly IClientStreamWriter<WriteDataPacketsRequest> writerStream;
-
-    public event EventHandler<DateTime>? ReceivedCompleted;
-
-    public event EventHandler<DateTime>? PublishedCompleted;
-
-    public event EventHandler<IReadOnlyList<PacketResponse>>? MessageReceived;
 
     public RunInfo(
         long runId,
@@ -36,6 +30,12 @@ public class RunInfo
         this.MessageSize = messageSize;
         this.writerStream = packetWriterServiceClient.WriteDataPackets().RequestStream;
     }
+
+    public event EventHandler<DateTime>? ReceivedCompleted;
+
+    public event EventHandler<DateTime>? PublishedCompleted;
+
+    public event EventHandler<IReadOnlyList<PacketResponse>>? MessageReceived;
 
     public long RunId { get; }
 
@@ -57,9 +57,13 @@ public class RunInfo
 
     public int PublishCounter => this.publishCounter;
 
-    private void IncrementPublishCounter(int value)
+    public string Title
     {
-        Interlocked.Add(ref this.publishCounter, value);
+        get
+        {
+            var state = !this.Completed ? "running" : "completed";
+            return $"Id:{this.RunId}-({this.DataSource}:{this.Stream}[{this.SessionKey}])->{state}";
+        }
     }
 
     public async Task Publish(WriteDataPacketsRequest writeDataPacketsRequest)
@@ -88,15 +92,6 @@ public class RunInfo
         this.PublishedCompleted?.Invoke(this, DateTime.Now);
     }
 
-    public string Title
-    {
-        get
-        {
-            var state = !this.Completed ? "running" : "completed";
-            return $"Id:{this.RunId}-({this.DataSource}:{this.Stream}[{this.SessionKey}])->{state}";
-        }
-    }
-
     public void OnMessageReceived(ReadPacketsResponse readPacket)
     {
         Interlocked.Add(ref this.receivedCounter, readPacket.Response.Count);
@@ -110,5 +105,10 @@ public class RunInfo
         this.ElapsedTime = (finishTime - this.RunStartingTime).TotalMilliseconds;
         this.ReceivedCompleted?.Invoke(this, finishTime);
         this.Completed = true;
+    }
+
+    private void IncrementPublishCounter(int value)
+    {
+        Interlocked.Add(ref this.publishCounter, value);
     }
 }

@@ -1,5 +1,5 @@
-﻿// <copyright file="SqlRaceSessionFactory.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SqlRaceSessionFactory.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using MA.Streaming.API;
 
@@ -44,7 +44,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
                 new SessionInfoWriter(clientSession),
                 new ErrorSqlRaceWriter(clientSession, configLock),
                 new RawCanSqlRaceWriter(clientSession),
-                new SynchroSqlRaceWriter(clientSession, configLock));
+                new SynchroSqlRaceWriter(clientSession, configLock),
+                new CoverageCursorWriter(clientSession));
             var packetHandler = new PacketHandler(
                 new PeriodicDataHandler(
                     sessionWriter,
@@ -76,7 +77,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
                     streamApiClient,
                     sessionConfig,
                     new SynchroConfigProcessor(configManager, defaultConversion, clientSession, configLock, sessionConfig),
-                    new SynchroPacketToSqlRaceSynchroMapper(sessionConfig)));
+                    new SynchroPacketToSqlRaceSynchroMapper(sessionConfig)),
+                new CoverageCursorHandler(sessionWriter));
 
             Console.WriteLine($"New SqlRaceSession is created with name {sessionName}.");
             return new SqlRaceSession(streamApiClient, clientSession, sessionKey, sessionWriter, packetHandler);

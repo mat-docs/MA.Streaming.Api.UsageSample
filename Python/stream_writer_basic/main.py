@@ -17,6 +17,7 @@ import grpc
 from google.protobuf import wrappers_pb2, any_pb2
 
 from ma.streaming.api.v1 import api_pb2
+from ma.streaming.api.v1.api_pb2_grpc import PacketWriterServiceStub
 from ma.streaming.open_data.v1 import open_data_pb2
 from ma.streaming.key_generator.v1 import key_generator_pb2_grpc, key_generator_pb2
 from packet_builder import SinWaveGenerator
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Configurations
 DATA_SOURCE = "Default"
 STREAM = "Stream1"
+MAIN_STREAM = ""
 KEY_GENERATOR_SERVER_ADDRESS = "localhost:15379"
 
 
@@ -54,6 +56,29 @@ def get_new_key_string():
     )
     return key_gen_response.string_key
 
+def write_packet(packet_writer_stub: PacketWriterServiceStub,
+                 packet_content: bytes,
+                 packet_type: str,
+                 data_source: str,
+                 session_key: str,
+                 stream: str,
+                 is_essential=False):
+    """Write a packet to a stream."""
+    message = open_data_pb2.Packet(
+        type=packet_type,
+        content=packet_content,
+        session_key=session_key,
+        is_essential=is_essential)
+    packet_writer_stub.WriteDataPacket(
+        request=api_pb2.WriteDataPacketRequest(
+            detail=api_pb2.DataPacketDetails(
+                message=message,
+                data_source=data_source,
+                stream=stream,
+                session_key=session_key)
+        )
+    )
+
 
 def main():
     stream_api = StreamApi()
@@ -65,10 +90,30 @@ def main():
     # Create a new session
     create_session_response = session_stub.CreateSession(
         api_pb2.CreateSessionRequest(
-            data_source=DATA_SOURCE
+            data_source=DATA_SOURCE,
+            identifier=f"TEST SESSION {datetime.datetime.now()}",
+            type="Session",
+            version=1
         )
     )
     session_key = create_session_response.session_key
+
+    # Write new session packets to every stream we plan to write to.
+    new_session_packet = open_data_pb2.NewSessionPacket(data_source=DATA_SOURCE)
+    write_packet(packet_writer_stub,
+                 new_session_packet.SerializeToString(),
+                 get_packet_type(new_session_packet),
+                 DATA_SOURCE,
+                 session_key,
+                 STREAM)
+
+    write_packet(packet_writer_stub,
+                 new_session_packet.SerializeToString(),
+                 get_packet_type(new_session_packet),
+                 DATA_SOURCE,
+                 session_key,
+                 MAIN_STREAM)
+
     logger.info("New session created. Session key: %s", session_key)
     time.sleep(3)
 
@@ -101,23 +146,9 @@ def main():
             config_id=config_id
         )
         packet_type = get_packet_type(config_packet)
-        message = open_data_pb2.Packet(
-            type=packet_type,
-            session_key=session_key,
-            is_essential=True,
-            content=config_packet.SerializeToString(),
-        )
         # Note that `stream` is omitted when publishing config packets, so it gets
         # published to the main stream and the essentials stream.
-        packet_writer_stub.WriteDataPacket(
-            request=api_pb2.WriteDataPacketRequest(
-                detail=api_pb2.DataPacketDetails(
-                    message=message,
-                    data_source=DATA_SOURCE,
-                    session_key=session_key,
-                )
-            )
-        )
+        write_packet(packet_writer_stub, config_packet.SerializeToString(), packet_type, DATA_SOURCE, session_key, MAIN_STREAM, is_essential=True)
         logger.info("Configuration packet published. Id: %s", config_id)
 
         # Write a metadata packet
@@ -128,23 +159,9 @@ def main():
         meta_packet.metadata["Driver"].CopyFrom(any_msg)
 
         packet_type = get_packet_type(meta_packet)
-        message = open_data_pb2.Packet(
-            type=packet_type,
-            session_key=session_key,
-            is_essential=True,
-            content=meta_packet.SerializeToString(),
-        )
         # Note that `stream` is omitted when publishing metadata packets, so it gets
         # published to the main stream and the essentials stream.
-        packet_writer_stub.WriteDataPacket(
-            request=api_pb2.WriteDataPacketRequest(
-                detail=api_pb2.DataPacketDetails(
-                    message=message,
-                    data_source=DATA_SOURCE,
-                    session_key=session_key,
-                )
-            )
-        )
+        write_packet(packet_writer_stub, meta_packet.SerializeToString(), packet_type, DATA_SOURCE, session_key, MAIN_STREAM, is_essential=True)
         logger.info("Metadata packet published.")
 
         # Generate the data format id, which corresponds to the list of parameter
@@ -162,22 +179,7 @@ def main():
                 data_format_id_response.data_format_identifier
             )
             packet_type = get_packet_type(packet_content)
-            message = open_data_pb2.Packet(
-                type=packet_type,
-                session_key=session_key,
-                is_essential=False,
-                content=packet_content.SerializeToString(),
-            )
-            packet_writer_stub.WriteDataPacket(
-                request=api_pb2.WriteDataPacketRequest(
-                    detail=api_pb2.DataPacketDetails(
-                        message=message,
-                        data_source=DATA_SOURCE,
-                        stream=STREAM,
-                        session_key=session_key,
-                    )
-                )
-            )
+            write_packet(packet_writer_stub, packet_content.SerializeToString(), packet_type, DATA_SOURCE, session_key, STREAM)
             logger.info("Data packet published.")
             time.sleep(1)
             if i % 20 == 0:
@@ -185,29 +187,22 @@ def main():
                     timestamp=sin_wave_generator.time_ns,
                     label=f"Lap {lap_count}",
                     type="Lap Trigger",
-                    value=lap_count
+                    value=lap_count,
+                    description=f"Lap {lap_count}",
+                    source="0"
                 )
                 packet_type = get_packet_type(lap_packet)
-                message = open_data_pb2.Packet(
-                    type=packet_type,
-                    session_key=session_key,
-                    is_essential=False,
-                    content=lap_packet.SerializeToString(),
-                )
-                packet_writer_stub.WriteDataPacket(
-                    request=api_pb2.WriteDataPacketRequest(
-                        detail=api_pb2.DataPacketDetails(
-                            message=message,
-                            data_source=DATA_SOURCE,
-                            stream=STREAM,
-                            session_key=session_key,
-                        )
-                    )
-                )
+                write_packet(packet_writer_stub, lap_packet.SerializeToString(), packet_type, DATA_SOURCE, session_key, STREAM)
                 lap_count = lap_count + 1
                 logger.info("Lap packet published.")
     finally:
         # Close the session regardless
+        # End the session by sending an end session packet to the streams and then closing the session.
+        end_packet = open_data_pb2.EndOfSessionPacket(data_source=DATA_SOURCE)
+        packet_type = get_packet_type(end_packet)
+        write_packet(packet_writer_stub, end_packet.SerializeToString(), packet_type, DATA_SOURCE, session_key, STREAM)
+        write_packet(packet_writer_stub, end_packet.SerializeToString(), packet_type, DATA_SOURCE, session_key, MAIN_STREAM)
+
         session_stub.EndSession(
             api_pb2.EndSessionRequest(data_source=DATA_SOURCE, session_key=session_key)
         )

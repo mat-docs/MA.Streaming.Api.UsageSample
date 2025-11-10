@@ -1,5 +1,5 @@
-﻿// <copyright file="SqlRaceWriter.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="SqlRaceWriter.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using Stream.Api.Stream.Reader.Abstractions;
 using Stream.Api.Stream.Reader.Dto;
@@ -17,6 +17,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
         private readonly ISqlRaceWriter errorSqlRaceWriter;
         private readonly ISqlRaceWriter rawCanSqlRaceWriter;
         private readonly ISqlRaceWriter synchroSqlRaceWriter;
+        private readonly ISqlRaceWriter coverageCursorWriter;
 
         public SqlRaceWriter(
             ISqlRaceWriter eventSqlRaceWriter,
@@ -27,7 +28,8 @@ namespace Stream.Api.Stream.Reader.SqlRace
             ISqlRaceWriter sessionInfoWriter,
             ISqlRaceWriter errorSqlRaceWriter,
             ISqlRaceWriter rawCanSqlRaceWriter,
-            ISqlRaceWriter synchroSqlRaceWriter)
+            ISqlRaceWriter synchroSqlRaceWriter,
+            ISqlRaceWriter coverageCursorWriter)
         {
             this.eventSqlRaceWriter = eventSqlRaceWriter;
             this.periodicSqlRaceWriter = periodicSqlRaceWriter;
@@ -38,6 +40,7 @@ namespace Stream.Api.Stream.Reader.SqlRace
             this.errorSqlRaceWriter = errorSqlRaceWriter;
             this.rawCanSqlRaceWriter = rawCanSqlRaceWriter;
             this.synchroSqlRaceWriter = synchroSqlRaceWriter;
+            this.coverageCursorWriter = coverageCursorWriter;
         }
 
         public long StartTimestamp { get; private set; } = long.MaxValue;
@@ -48,7 +51,11 @@ namespace Stream.Api.Stream.Reader.SqlRace
         {
             var dataType = data.DataType;
             bool success;
-            if (dataType != "Session Info" && dataType != "Lap" && dataType != "Marker" && dataType != "Event" && dataType != "Error")
+            if (dataType != "Session Info" &&
+                dataType != "Lap" &&
+                dataType != "Marker" &&
+                dataType != "Event" &&
+                dataType != "Error")
             {
                 if (data.Timestamp < this.StartTimestamp)
                 {
@@ -106,6 +113,11 @@ namespace Stream.Api.Stream.Reader.SqlRace
                 case SqlRaceSynchroDto:
                 {
                     success = this.synchroSqlRaceWriter.TryWrite(data);
+                    break;
+                }
+                case SqlRaceCoverageCursor:
+                {
+                    success = this.coverageCursorWriter.TryWrite(data);
                     break;
                 }
                 default:

@@ -1,5 +1,5 @@
-﻿// <copyright file="EventConfigProcessor.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
+﻿// <copyright file="EventConfigProcessor.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -120,7 +120,6 @@ namespace Stream.Api.Stream.Reader.SqlRace.SqlRaceConfigProcessor
             {
                 this.ConfigLock.EnterWriteLock();
                 config.Commit();
-
             }
             catch (ConfigurationSetAlreadyExistsException)
             {

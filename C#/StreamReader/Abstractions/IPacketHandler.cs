@@ -1,7 +1,5 @@
-﻿// <copyright file="IPacketHandler.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
-
-using MA.Streaming.OpenData;
+﻿// <copyright file="IPacketHandler.cs" company="Motion Applied Ltd.">
+// Copyright (c) Motion Applied Ltd.</copyright>
 
 namespace Stream.Api.Stream.Reader.Abstractions
 {
